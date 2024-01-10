@@ -25,10 +25,7 @@ func main() {
 func reportCollect(baseUrl string, reportInterval int, mc *services.MerticsCollector) {
 	for {
 		metrics := mc.Collect()
-		err := sendMetricsToServer(baseUrl, metrics)
-		if err != nil {
-			panic(err)
-		}
+		sendMetricsToServer(baseUrl, metrics)
 		time.Sleep(time.Duration(reportInterval) * time.Second)
 	}
 }

@@ -1,9 +1,8 @@
 package services
 
 import (
+	"math/rand"
 	"runtime"
-
-	"golang.org/x/exp/rand"
 )
 
 type MerticsCollector struct {
@@ -15,7 +14,7 @@ func NewMetricsCollector() *MerticsCollector {
 }
 
 type AgentMetrics struct {
-	Gauge map[string]float64
+	Gauge   map[string]float64
 	Counter map[string]int
 }
 
@@ -26,7 +25,6 @@ func newAgentMetrics() *AgentMetrics {
 func (mc *MerticsCollector) Collect() *AgentMetrics {
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
-
 
 	metrics := newAgentMetrics()
 
@@ -63,7 +61,6 @@ func (mc *MerticsCollector) Collect() *AgentMetrics {
 
 	return metrics
 }
-
 
 func (mc *MerticsCollector) increasePollCount() {
 	mc.pollCount++
