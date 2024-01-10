@@ -126,9 +126,14 @@ func TestHandlers(t *testing.T) {
 			h := UpdateMetricHandler(memStorage)
 			req := httptest.NewRequest(tt.method, tt.request, nil)
 			w := httptest.NewRecorder()
+
 			h.ServeHTTP(w, req)
-			defer w.Result().Body.Close()
-			assert.Equal(t, tt.want.statusCode, w.Result().StatusCode)
+
+			res := w.Result()
+			defer res.Body.Close()
+
+			assert.Equal(t, tt.want.statusCode, res.StatusCode)
+
 			if !tt.want.err {
 				metric, err := memStorage.Find(tt.metricName)
 				require.NoError(t, err)
