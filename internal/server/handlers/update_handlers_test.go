@@ -127,7 +127,7 @@ func TestHandlers(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.request, nil)
 			w := httptest.NewRecorder()
 			h.ServeHTTP(w, req)
-
+			defer w.Result().Body.Close()
 			assert.Equal(t, tt.want.statusCode, w.Result().StatusCode)
 			if !tt.want.err {
 				metric, err := memStorage.Find(tt.metricName)

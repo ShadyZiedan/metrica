@@ -15,45 +15,61 @@ func main() {
 	reportInterval := 10
 
 	mc := services.NewMetricsCollector()
-	baseUrl := "http://localhost:8080"
+	baseURL := "http://localhost:8080"
 	go pollCollect(pollInterval, mc)
-	go reportCollect(baseUrl, reportInterval, mc)
+	go reportCollect(baseURL, reportInterval, mc)
 	c := make(chan os.Signal, 1)
-	<- c
+	<-c
 }
 
-func reportCollect(baseUrl string, reportInterval int, mc *services.MerticsCollector) {
+func reportCollect(baseURL string, reportInterval int, mc *services.MerticsCollector) {
 	for {
 		metrics := mc.Collect()
-		sendMetricsToServer(baseUrl, metrics)
+		sendMetricsToServer(baseURL, metrics)
 		time.Sleep(time.Duration(reportInterval) * time.Second)
 	}
 }
 
-
-func sendMetricsToServer(baseUrl string, metrics *services.AgentMetrics) error {
+func sendMetricsToServer(baseURL string, metrics *services.AgentMetrics) error {
 	for metricName, val := range metrics.Gauge {
-		url := fmt.Sprintf("%s/update/%s/%s/%v", baseUrl, "gauge", metricName, val)
-		res, err := http.Post(url, "text/plain", nil)
+		err := sendGauge(baseURL, metricName, val)
 		if err != nil {
 			return err
-		}
-		if res.StatusCode != http.StatusOK {
-			return errors.New("status not ok")
 		}
 	}
 	for metricName, val := range metrics.Counter {
-		url := fmt.Sprintf("%s/update/%s/%s/%v", baseUrl, "counter", metricName, val)
-		res, err := http.Post(url, "text/plain", nil)
+		err := sendCounter(baseURL, metricName, val)
 		if err != nil {
 			return err
 		}
-		if res.StatusCode != http.StatusOK {
-			return errors.New("status not ok")
-		}
 	}
 	return nil
+}
 
+func sendCounter(baseURL, metricName string, val int) error {
+	url := fmt.Sprintf("%s/update/%s/%s/%v", baseURL, "counter", metricName, val)
+	res, err := http.Post(url, "text/plain", nil)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return errors.New("status not ok")
+	}
+	return nil
+}
+
+func sendGauge(baseURL, metricName string, val float64) error {
+	url := fmt.Sprintf("%s/update/%s/%s/%v", baseURL, "gauge", metricName, val)
+	res, err := http.Post(url, "text/plain", nil)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return errors.New("status not ok")
+	}
+	return nil
 }
 
 func pollCollect(pollInterval int, mc *services.MerticsCollector) {
