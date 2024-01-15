@@ -81,7 +81,7 @@ func TestHandlers(t *testing.T) {
 				gauge      float64
 				err        bool
 			}{
-				statusCode: http.StatusInternalServerError,
+				statusCode: http.StatusBadRequest,
 				err:        true,
 			},
 		},
