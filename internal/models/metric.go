@@ -1,6 +1,7 @@
 package models
 
 type Metric struct {
+	Name    string
 	gauge   float64
 	counter int64
 }

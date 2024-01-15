@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/shadyziedan/metrica/internal/server/handlers"
 	"github.com/shadyziedan/metrica/internal/server/storage"
 )
@@ -12,17 +13,14 @@ type Server interface {
 }
 
 type WebServer struct {
-	host string
-	repository storage.MetricsRepository 
+	host       string
+	repository storage.MetricsRepository
 }
 
 // ListenAndServe implements Server.
 func (ws *WebServer) ListenAndServe() error {
-	mux := http.NewServeMux()
-	mux.Handle(`/update/counter/`, handlers.UpdateMetricHandler(ws.repository))
-	mux.Handle(`/update/gauge/`, handlers.UpdateMetricHandler(ws.repository))
-	mux.Handle(`/update/`, http.HandlerFunc(handlers.UnknownMetricHandler))
-	return http.ListenAndServe(ws.host, mux)
+	router := handlers.NewRouter(ws.repository)
+	return http.ListenAndServe(ws.host, router)
 }
 
 func NewWebServer(host string, repository storage.MetricsRepository) *WebServer {

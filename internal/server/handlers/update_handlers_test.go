@@ -11,8 +11,6 @@ import (
 )
 
 func TestHandlers(t *testing.T) {
-	memStorage := storage.NewMemStorage()
-
 	tests := []struct {
 		title      string
 		request    string
@@ -121,15 +119,17 @@ func TestHandlers(t *testing.T) {
 		},
 	}
 
+	memStorage := storage.NewMemStorage()
+	router := NewRouter(memStorage)
+	srv := httptest.NewServer(router)
+	defer srv.Close()
+	client := &http.Client{}
 	for _, tt := range tests {
 		t.Run(tt.title, func(t *testing.T) {
-			h := UpdateMetricHandler(memStorage)
-			req := httptest.NewRequest(tt.method, tt.request, nil)
-			w := httptest.NewRecorder()
-
-			h.ServeHTTP(w, req)
-
-			res := w.Result()
+			req, err := http.NewRequest(tt.method, srv.URL+tt.request, nil)
+			require.NoError(t, err)
+			res, err := client.Do(req)
+			require.NoError(t, err)
 			defer res.Body.Close()
 
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
