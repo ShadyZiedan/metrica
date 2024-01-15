@@ -38,7 +38,7 @@ func UpdateMetricHandler(storage storage.MetricsRepository) http.HandlerFunc {
 			metric.UpdateGauge(num)
 			return
 		default:
-			http.Error(w, "unknown metric type", http.StatusInternalServerError)
+			http.Error(w, "unknown metric type", http.StatusBadRequest)
 		}
 
 	}
