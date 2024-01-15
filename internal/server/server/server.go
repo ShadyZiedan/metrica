@@ -3,7 +3,6 @@ package server
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/shadyziedan/metrica/internal/server/handlers"
 	"github.com/shadyziedan/metrica/internal/server/storage"
 )
