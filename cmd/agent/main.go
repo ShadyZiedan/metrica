@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"time"
@@ -10,13 +11,16 @@ import (
 )
 
 func main() {
-	pollInterval := 2
-	reportInterval := 10
+	address := flag.String("a", "localhost:8080", "адрес эндпоинта HTTP-сервера")
+	pollInterval := flag.Int("p", 2, "частота опроса метрик из пакета runtime")
+	reportInterval := flag.Int("r", 10, "частота отправки метрик на сервер")
 
+	flag.Parse()
+	baseURL := "http://" + *address
+	
 	mc := services.NewMetricsCollector()
-	baseURL := "http://localhost:8080"
-	go pollCollect(pollInterval, mc)
-	go reportCollect(baseURL, reportInterval, mc)
+	go pollCollect(*pollInterval, mc)
+	go reportCollect(baseURL, *reportInterval, mc)
 	c := make(chan os.Signal, 1)
 	<-c
 }
