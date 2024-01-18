@@ -5,8 +5,8 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/shadyziedan/metrica/cmd/agent/config"
 	"github.com/shadyziedan/metrica/internal/agent/agent"
+	"github.com/shadyziedan/metrica/internal/agent/config"
 )
 
 func main() {

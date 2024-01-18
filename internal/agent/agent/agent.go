@@ -26,7 +26,9 @@ func (a *Agent) Run(ctx context.Context) {
 	mc := services.NewMetricsCollector()
 
 	pollChan := time.NewTicker(time.Duration(a.PollInterval) * time.Second)
+	defer pollChan.Stop()
 	reportChan := time.NewTicker(time.Duration(a.ReportInterval) * time.Second)
+	defer reportChan.Stop()
 
 	for {
 		select {
@@ -34,25 +36,33 @@ func (a *Agent) Run(ctx context.Context) {
 			mc.IncreasePollCount()
 		case <-reportChan.C:
 			metrics := mc.Collect()
-			a.sendMetricsToServer(metrics)
+			a.sendMetricsToServer(ctx, metrics)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (a *Agent) sendMetricsToServer(metrics *services.AgentMetrics) error {
-	for metricName, val := range metrics.Gauge {
-		_, err := a.Client.R().Post(fmt.Sprintf("/update/gauge/%s/%v", metricName, val))
-		if err != nil {
-			return err
+func (a *Agent) sendMetricsToServer(ctx context.Context, metrics *services.AgentMetrics) error {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	select {
+	case <-timeoutCtx.Done():
+		return timeoutCtx.Err()
+	default:
+		for _, metric := range metrics.Gauge.GetAll() {
+			_, err := a.Client.R().Post(fmt.Sprintf("/update/gauge/%s/%v", metric.Name, metric.Value))
+			if err != nil {
+				return fmt.Errorf("update gauge '%s'->'%v': %w", metric.Name, metric.Value, err)
+			}
 		}
-	}
-	for metricName, val := range metrics.Counter {
-		_, err := a.Client.R().Post(fmt.Sprintf("/update/counter/%s/%v", metricName, val))
-		if err != nil {
-			return err
+		for _, metric := range metrics.Counter.GetAll() {
+			_, err := a.Client.R().Post(fmt.Sprintf("/update/counter/%s/%v", metric.Name, metric.Value))
+			if err != nil {
+				return fmt.Errorf("update counter '%s'->'%v': %w", metric.Name, metric.Value, err)
+			}
 		}
+		return nil
 	}
-	return nil
+
 }

@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/shadyziedan/metrica/internal/models"
-	"github.com/shadyziedan/metrica/internal/repositories"
 	"golang.org/x/exp/maps"
 )
 
@@ -13,6 +12,10 @@ type MemStorage struct {
 	storage map[string]*models.Metric
 	m       sync.RWMutex
 }
+
+var ErrMetricNotCreated = errors.New("couldn't create a metric")
+var ErrMetricAlreadyExists = errors.New("metric has been already created")
+var ErrMetricNotFound = errors.New("metric not found")
 
 // FindAll implements MetricsRepository.
 func (s *MemStorage) FindAll() ([]*models.Metric, error) {
@@ -27,31 +30,29 @@ func (s *MemStorage) FindOrCreate(name string) (*models.Metric, error) {
 		return metric, nil
 	}
 	if err := s.Create(name); err != nil {
-		return nil, repositories.ErrMetricNotCreated
+		return nil, ErrMetricNotCreated
 	}
 	return s.Find(name)
 }
 
-// Create implements MetricsStorage.
+// Create implements MetricsRepository.
 func (s *MemStorage) Create(name string) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 	if _, err := s.Find(name); err == nil {
-		return errors.New("Metric has been already created")
+		return ErrMetricAlreadyExists
 	}
 	s.storage[name] = &models.Metric{Name: name}
 	return nil
 }
 
-// Find implements MetricsStorage.
+// Find implements MetricsRepository.
 func (s *MemStorage) Find(name string) (*models.Metric, error) {
 	if v, ok := s.storage[name]; ok {
 		return v, nil
 	}
-	return nil, errors.New("Metric not found")
+	return nil, ErrMetricNotFound
 }
-
-var _ repositories.MetricsRepository = (*MemStorage)(nil)
 
 func NewMemStorage() *MemStorage {
 	return &MemStorage{storage: make(map[string]*models.Metric)}

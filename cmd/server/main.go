@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/shadyziedan/metrica/cmd/server/config"
+	"github.com/shadyziedan/metrica/internal/server/config"
 	"github.com/shadyziedan/metrica/internal/server/server"
 	"github.com/shadyziedan/metrica/internal/server/storage"
 )

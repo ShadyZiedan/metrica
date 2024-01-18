@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"github.com/go-chi/chi/v5"
-	"github.com/shadyziedan/metrica/internal/repositories"
 )
 
-func NewRouter(repo repositories.MetricsRepository) chi.Router {
+func NewRouter(repo MetricsRepository) chi.Router {
 	r := chi.NewRouter()
-	r.Post(`/update/{metricType}/{metricName}/{metricValue}`, UpdateMetricHandler(repo))
-	r.Get(`/value/{metricType}/{metricName}`, MetricHandler(repo))
-	r.Get(`/`, MetricsHandler(repo))
+	metricsHandler := NewMetricHandler(repo)
+	r.Post(`/update/{metricType}/{metricName}/{metricValue}`, metricsHandler.UpdateMetricHandler)
+	r.Get(`/value/{metricType}/{metricName}`, metricsHandler.GetMetric)
+	r.Get(`/`, metricsHandler.GetAll)
 	return r
 }

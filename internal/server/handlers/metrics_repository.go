@@ -1,8 +1,6 @@
-package repositories
+package handlers
 
 import (
-	"errors"
-
 	"github.com/shadyziedan/metrica/internal/models"
 )
 
@@ -12,5 +10,3 @@ type MetricsRepository interface {
 	FindOrCreate(name string) (*models.Metric, error)
 	FindAll() ([]*models.Metric, error)
 }
-
-var ErrMetricNotCreated = errors.New("couldn't create a metric")
