@@ -4,7 +4,7 @@ import (
 	"html/template"
 	"net/http"
 
-	"github.com/shadyziedan/metrica/internal/server/storage"
+	"github.com/shadyziedan/metrica/internal/repositories"
 )
 
 const metricsTemplate = `
@@ -24,7 +24,7 @@ const metricsTemplate = `
 </table>
 `
 
-func MetricsHandler(repo storage.MetricsRepository) http.HandlerFunc {
+func MetricsHandler(repo repositories.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		metrics, err := repo.FindAll()
 		if err != nil {

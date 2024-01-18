@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/shadyziedan/metrica/internal/models"
+	"github.com/shadyziedan/metrica/internal/repositories"
 	"golang.org/x/exp/maps"
 )
 
@@ -26,7 +27,7 @@ func (s *MemStorage) FindOrCreate(name string) (*models.Metric, error) {
 		return metric, nil
 	}
 	if err := s.Create(name); err != nil {
-		return nil, ErrMetricNotCreated
+		return nil, repositories.ErrMetricNotCreated
 	}
 	return s.Find(name)
 }
@@ -50,7 +51,7 @@ func (s *MemStorage) Find(name string) (*models.Metric, error) {
 	return nil, errors.New("Metric not found")
 }
 
-var _ MetricsRepository = (*MemStorage)(nil)
+var _ repositories.MetricsRepository = (*MemStorage)(nil)
 
 func NewMemStorage() *MemStorage {
 	return &MemStorage{storage: make(map[string]*models.Metric)}

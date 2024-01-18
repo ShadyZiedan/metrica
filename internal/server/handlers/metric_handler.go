@@ -6,10 +6,10 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/shadyziedan/metrica/internal/server/storage"
+	"github.com/shadyziedan/metrica/internal/repositories"
 )
 
-func MetricHandler(repo storage.MetricsRepository) http.HandlerFunc {
+func MetricHandler(repo repositories.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		metricType := chi.URLParam(r, "metricType")
 		metricName := chi.URLParam(r, "metricName")

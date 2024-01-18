@@ -5,10 +5,10 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/shadyziedan/metrica/internal/server/storage"
+	"github.com/shadyziedan/metrica/internal/repositories"
 )
 
-func UpdateMetricHandler(storage storage.MetricsRepository) http.HandlerFunc {
+func UpdateMetricHandler(storage repositories.MetricsRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		metricType := chi.URLParam(r, "metricType")
 		metricName := chi.URLParam(r, "metricName")

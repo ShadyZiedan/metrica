@@ -3,8 +3,8 @@ package server
 import (
 	"net/http"
 
+	"github.com/shadyziedan/metrica/internal/repositories"
 	"github.com/shadyziedan/metrica/internal/server/handlers"
-	"github.com/shadyziedan/metrica/internal/server/storage"
 )
 
 type Server interface {
@@ -13,7 +13,7 @@ type Server interface {
 
 type WebServer struct {
 	host       string
-	repository storage.MetricsRepository
+	repository repositories.MetricsRepository
 }
 
 // ListenAndServe implements Server.
@@ -22,7 +22,7 @@ func (ws *WebServer) ListenAndServe() error {
 	return http.ListenAndServe(ws.host, router)
 }
 
-func NewWebServer(host string, repository storage.MetricsRepository) *WebServer {
+func NewWebServer(host string, repository repositories.MetricsRepository) *WebServer {
 	return &WebServer{host: host, repository: repository}
 }
 

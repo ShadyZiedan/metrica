@@ -30,9 +30,9 @@ func (a *Agent) Run(ctx context.Context) {
 
 	for {
 		select {
-		case <- pollChan.C:
+		case <-pollChan.C:
 			mc.IncreasePollCount()
-		case <- reportChan.C:
+		case <-reportChan.C:
 			metrics := mc.Collect()
 			a.sendMetricsToServer(metrics)
 		case <-ctx.Done():
