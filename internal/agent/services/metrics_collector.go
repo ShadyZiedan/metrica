@@ -56,12 +56,11 @@ func (mc *MerticsCollector) Collect() *AgentMetrics {
 
 	metrics.Gauge["RandomValue"] = rand.Float64()
 
-	mc.increasePollCount()
 	metrics.Counter["PollCount"] = mc.pollCount
 
 	return metrics
 }
 
-func (mc *MerticsCollector) increasePollCount() {
+func (mc *MerticsCollector) IncreasePollCount() {
 	mc.pollCount++
 }

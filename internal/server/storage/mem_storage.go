@@ -5,20 +5,19 @@ import (
 
 	"github.com/go-errors/errors"
 	"github.com/shadyziedan/metrica/internal/models"
+	"golang.org/x/exp/maps"
 )
 
 type MemStorage struct {
 	storage map[string]*models.Metric
-	m       sync.Mutex
+	m       sync.RWMutex
 }
 
 // FindAll implements MetricsRepository.
 func (s *MemStorage) FindAll() ([]*models.Metric, error) {
-	metrics := make([]*models.Metric, 0, len(s.storage))
-	for _, metric := range s.storage {
-		metrics = append(metrics, metric)
-	}
-	return metrics, nil
+	s.m.RLock()
+	defer s.m.RUnlock()
+	return maps.Values(s.storage), nil
 }
 
 // FindOrCreate implements MetricsRepository.
@@ -27,7 +26,7 @@ func (s *MemStorage) FindOrCreate(name string) (*models.Metric, error) {
 		return metric, nil
 	}
 	if err := s.Create(name); err != nil {
-		return nil, errors.New("Couldn't create a metric")
+		return nil, ErrMetricNotCreated
 	}
 	return s.Find(name)
 }
