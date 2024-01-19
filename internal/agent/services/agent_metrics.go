@@ -23,16 +23,11 @@ type CounterCollection struct {
 	collection map[string]int
 }
 
-func newCounterCollection() *CounterCollection {
-	return &CounterCollection{collection: make(map[string]int)}
-}
-
-func newGaugeCollection() *GaugeCollection {
-	return &GaugeCollection{collection: make(map[string]float64)}
-}
-
 func newAgentMetrics() *AgentMetrics {
-	return &AgentMetrics{Gauge: newGaugeCollection(), Counter: newCounterCollection()}
+	return &AgentMetrics{
+		Gauge:   &GaugeCollection{collection: make(map[string]float64)},
+		Counter: &CounterCollection{collection: make(map[string]int)},
+	}
 }
 
 func (gc *GaugeCollection) UpdateMetric(name string, value float64) {
@@ -40,11 +35,11 @@ func (gc *GaugeCollection) UpdateMetric(name string, value float64) {
 }
 
 func (cc *CounterCollection) UpdateMetric(name string, value int) {
-	cc.collection[name]++
+	cc.collection[name] = value
 }
 
 func (gc *GaugeCollection) GetAll() []GaugeMetric {
-	var gaugeMetrics []GaugeMetric
+	gaugeMetrics := make([]GaugeMetric, 0, len(gc.collection))
 	for name, val := range gc.collection {
 		gaugeMetrics = append(gaugeMetrics, GaugeMetric{Name: name, Value: val})
 	}
@@ -52,7 +47,7 @@ func (gc *GaugeCollection) GetAll() []GaugeMetric {
 }
 
 func (cc *CounterCollection) GetAll() []CounterMetric {
-	var counterMetrics []CounterMetric
+	counterMetrics := make([]CounterMetric, 0, len(cc.collection))
 	for name, val := range cc.collection {
 		counterMetrics = append(counterMetrics, CounterMetric{Name: name, Value: val})
 	}

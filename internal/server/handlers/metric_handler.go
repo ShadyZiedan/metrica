@@ -1,9 +1,18 @@
 package handlers
 
+import "github.com/shadyziedan/metrica/internal/models"
+
 type MetricHandler struct {
-	repository MetricsRepository
+	repository metricsRepository
 }
 
-func NewMetricHandler(repository MetricsRepository) *MetricHandler {
+type metricsRepository interface {
+	Find(name string) (*models.Metric, error)
+	Create(name string) error
+	FindOrCreate(name string) (*models.Metric, error)
+	FindAll() ([]*models.Metric, error)
+}
+
+func NewMetricHandler(repository metricsRepository) *MetricHandler {
 	return &MetricHandler{repository: repository}
 }

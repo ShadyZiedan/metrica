@@ -13,9 +13,11 @@ type MemStorage struct {
 	m       sync.RWMutex
 }
 
-var ErrMetricNotCreated = errors.New("couldn't create a metric")
-var ErrMetricAlreadyExists = errors.New("metric has been already created")
-var ErrMetricNotFound = errors.New("metric not found")
+var (
+	ErrMetricNotCreated    = errors.New("couldn't create a metric")
+	ErrMetricAlreadyExists = errors.New("metric has been already created")
+	ErrMetricNotFound      = errors.New("metric not found")
+)
 
 // FindAll implements MetricsRepository.
 func (s *MemStorage) FindAll() ([]*models.Metric, error) {

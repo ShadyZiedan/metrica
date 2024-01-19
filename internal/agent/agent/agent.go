@@ -15,6 +15,8 @@ type Agent struct {
 	ReportInterval int
 }
 
+const ClientTimeout = 5
+
 func NewAgent(baseURL string, pollInterval, reportInterval int) *Agent {
 	client := resty.New()
 	client.BaseURL = baseURL
@@ -44,25 +46,19 @@ func (a *Agent) Run(ctx context.Context) {
 }
 
 func (a *Agent) sendMetricsToServer(ctx context.Context, metrics *services.AgentMetrics) error {
-	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(ctx, ClientTimeout*time.Second)
 	defer cancel()
-	select {
-	case <-timeoutCtx.Done():
-		return timeoutCtx.Err()
-	default:
-		for _, metric := range metrics.Gauge.GetAll() {
-			_, err := a.Client.R().Post(fmt.Sprintf("/update/gauge/%s/%v", metric.Name, metric.Value))
-			if err != nil {
-				return fmt.Errorf("update gauge '%s'->'%v': %w", metric.Name, metric.Value, err)
-			}
+	for _, metric := range metrics.Gauge.GetAll() {
+		_, err := a.Client.R().SetContext(timeoutCtx).Post(fmt.Sprintf("/update/gauge/%s/%v", metric.Name, metric.Value))
+		if err != nil {
+			return fmt.Errorf("update gauge '%s'->'%v': %w", metric.Name, metric.Value, err)
 		}
-		for _, metric := range metrics.Counter.GetAll() {
-			_, err := a.Client.R().Post(fmt.Sprintf("/update/counter/%s/%v", metric.Name, metric.Value))
-			if err != nil {
-				return fmt.Errorf("update counter '%s'->'%v': %w", metric.Name, metric.Value, err)
-			}
-		}
-		return nil
 	}
-
+	for _, metric := range metrics.Counter.GetAll() {
+		_, err := a.Client.R().SetContext(timeoutCtx).Post(fmt.Sprintf("/update/counter/%s/%v", metric.Name, metric.Value))
+		if err != nil {
+			return fmt.Errorf("update counter '%s'->'%v': %w", metric.Name, metric.Value, err)
+		}
+	}
+	return nil
 }

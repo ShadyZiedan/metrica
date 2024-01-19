@@ -1,9 +1,8 @@
 package server
 
 import (
+	"github.com/go-chi/chi/v5"
 	"net/http"
-
-	"github.com/shadyziedan/metrica/internal/server/handlers"
 )
 
 type Server interface {
@@ -11,18 +10,17 @@ type Server interface {
 }
 
 type WebServer struct {
-	host       string
-	repository handlers.MetricsRepository
+	host   string
+	router chi.Router
 }
 
 // ListenAndServe implements Server.
 func (ws *WebServer) ListenAndServe() error {
-	router := handlers.NewRouter(ws.repository)
-	return http.ListenAndServe(ws.host, router)
+	return http.ListenAndServe(ws.host, ws.router)
 }
 
-func NewWebServer(host string, repository handlers.MetricsRepository) *WebServer {
-	return &WebServer{host: host, repository: repository}
+func NewWebServer(host string, router chi.Router) *WebServer {
+	return &WebServer{host: host, router: router}
 }
 
 var _ Server = (*WebServer)(nil)

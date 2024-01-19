@@ -4,7 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func NewRouter(repo MetricsRepository) chi.Router {
+func NewRouter(repo metricsRepository) chi.Router {
 	r := chi.NewRouter()
 	metricsHandler := NewMetricHandler(repo)
 	r.Post(`/update/{metricType}/{metricName}/{metricValue}`, metricsHandler.UpdateMetricHandler)
