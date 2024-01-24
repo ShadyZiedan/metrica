@@ -2,10 +2,14 @@ package handlers
 
 import (
 	"github.com/go-chi/chi/v5"
+	"net/http"
 )
 
-func NewRouter(repo metricsRepository) chi.Router {
+type middleware = func(http.Handler) http.Handler
+
+func NewRouter(repo metricsRepository, middlewares ...middleware) chi.Router {
 	r := chi.NewRouter()
+	r.Use(middlewares...)
 	metricsHandler := NewMetricHandler(repo)
 	r.Post(`/update/{metricType}/{metricName}/{metricValue}`, metricsHandler.UpdateMetricHandler)
 	r.Get(`/value/{metricType}/{metricName}`, metricsHandler.GetMetric)
