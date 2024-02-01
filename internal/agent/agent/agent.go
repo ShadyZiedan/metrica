@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"github.com/shadyziedan/metrica/internal/models"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -49,13 +50,24 @@ func (a *Agent) sendMetricsToServer(ctx context.Context, metrics *services.Agent
 	timeoutCtx, cancel := context.WithTimeout(ctx, ClientTimeout*time.Second)
 	defer cancel()
 	for _, metric := range metrics.Gauge.GetAll() {
-		_, err := a.Client.R().SetContext(timeoutCtx).Post(fmt.Sprintf("/update/gauge/%s/%v", metric.Name, metric.Value))
+		model := &models.Metrics{
+			ID:    metric.Name,
+			MType: "gauge",
+			Value: &metric.Value,
+		}
+		_, err := a.Client.R().SetContext(timeoutCtx).SetBody(model).Post("/update/")
 		if err != nil {
 			return fmt.Errorf("update gauge '%s'->'%v': %w", metric.Name, metric.Value, err)
 		}
 	}
 	for _, metric := range metrics.Counter.GetAll() {
-		_, err := a.Client.R().SetContext(timeoutCtx).Post(fmt.Sprintf("/update/counter/%s/%v", metric.Name, metric.Value))
+		delta := int64(metric.Value)
+		model := &models.Metrics{
+			ID:    metric.Name,
+			MType: "counter",
+			Delta: &delta,
+		}
+		_, err := a.Client.R().SetContext(timeoutCtx).SetBody(model).Post("/update/")
 		if err != nil {
 			return fmt.Errorf("update counter '%s'->'%v': %w", metric.Name, metric.Value, err)
 		}
