@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func (h *MetricHandler) UpdateJson(w http.ResponseWriter, r *http.Request) {
+func (h *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 	data := &models.Metrics{}
 
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {

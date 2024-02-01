@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func (h *MetricHandler) GetMetricJson(w http.ResponseWriter, r *http.Request) {
+func (h *MetricHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	data := &models.Metrics{}
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		http.Error(w, "invalid data format", http.StatusBadRequest)

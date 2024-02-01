@@ -16,7 +16,7 @@ func NewRouter(repo metricsRepository, middlewares ...middleware) chi.Router {
 	r.Get(`/`, metricsHandler.GetAll)
 
 	//json api
-	r.Post(`/update/`, metricsHandler.UpdateJson)
-	r.Post(`/value/`, metricsHandler.GetMetricJson)
+	r.Post(`/update/`, metricsHandler.UpdateJSON)
+	r.Post(`/value/`, metricsHandler.GetMetricJSON)
 	return r
 }
