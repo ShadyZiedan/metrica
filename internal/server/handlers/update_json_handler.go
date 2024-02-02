@@ -8,7 +8,6 @@ import (
 
 func (h *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 	data := &models.Metrics{}
-
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

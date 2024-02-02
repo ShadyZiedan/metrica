@@ -16,7 +16,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	router := handlers.NewRouter(memStorage, middleware.RequestLogger)
+	router := handlers.NewRouter(memStorage, middleware.RequestLogger, middleware.Compress)
 	srv := server.NewWebServer(
 		cnf.Address,
 		router,

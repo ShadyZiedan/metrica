@@ -1,7 +1,10 @@
 package agent
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/shadyziedan/metrica/internal/models"
 	"time"
@@ -55,8 +58,7 @@ func (a *Agent) sendMetricsToServer(ctx context.Context, metrics *services.Agent
 			MType: "gauge",
 			Value: &metric.Value,
 		}
-		_, err := a.Client.R().SetContext(timeoutCtx).SetBody(model).Post("/update/")
-		if err != nil {
+		if err := a.sendMetric(timeoutCtx, model); err != nil {
 			return fmt.Errorf("update gauge '%s'->'%v': %w", metric.Name, metric.Value, err)
 		}
 	}
@@ -67,10 +69,41 @@ func (a *Agent) sendMetricsToServer(ctx context.Context, metrics *services.Agent
 			MType: "counter",
 			Delta: &delta,
 		}
-		_, err := a.Client.R().SetContext(timeoutCtx).SetBody(model).Post("/update/")
-		if err != nil {
+		if err := a.sendMetric(timeoutCtx, model); err != nil {
 			return fmt.Errorf("update counter '%s'->'%v': %w", metric.Name, metric.Value, err)
 		}
 	}
 	return nil
+}
+
+func (a Agent) sendMetric(ctx context.Context, model *models.Metrics) error {
+	body, err := marshallAndCompressMetric(model)
+	if err != nil {
+		return err
+	}
+	_, err = a.Client.R().SetContext(ctx).
+		SetHeader("Content-Encoding", "gzip").
+		SetHeader("Content-Type", "application/json").
+		SetBody(body).Post("/update/")
+	return err
+}
+
+func marshallAndCompressMetric(m *models.Metrics) ([]byte, error) {
+	jsonEncoded, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	gzWriter, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+	if err != nil {
+		return nil, err
+	}
+	_, err = gzWriter.Write(jsonEncoded)
+	if err != nil {
+		return nil, err
+	}
+	if err = gzWriter.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
