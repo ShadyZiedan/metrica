@@ -44,7 +44,7 @@ type Mode string
 
 const (
 	Async  Mode = "async"
-	Normal      = "normal"
+	Normal Mode = "normal"
 )
 
 func newProducer(fileName string, mode Mode) (*producer, error) {
