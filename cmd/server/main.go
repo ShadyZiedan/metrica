@@ -2,6 +2,11 @@ package main
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+
 	"github.com/shadyziedan/metrica/internal/server/config"
 	"github.com/shadyziedan/metrica/internal/server/handlers"
 	"github.com/shadyziedan/metrica/internal/server/logger"
@@ -9,8 +14,6 @@ import (
 	"github.com/shadyziedan/metrica/internal/server/server"
 	"github.com/shadyziedan/metrica/internal/server/services"
 	"github.com/shadyziedan/metrica/internal/server/storage"
-	"os"
-	"os/signal"
 )
 
 func main() {
@@ -21,9 +24,16 @@ func main() {
 		StoreInterval:   cnf.StoreInterval,
 		Restore:         cnf.Restore,
 	})
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	go fileStorageService.Run(ctx)
+	go func() {
+		defer wg.Done()
+		fileStorageService.Run(ctx)
+	}()
 
 	err := logger.Initialize("info")
 	if err != nil {
@@ -34,8 +44,13 @@ func main() {
 		cnf.Address,
 		router,
 	)
-	err = srv.ListenAndServe(ctx)
-	if err != nil {
-		panic(err)
-	}
+
+	go func() {
+		defer wg.Done()
+		err = srv.ListenAndServe(ctx)
+		if err != nil {
+			panic(err)
+		}
+	}()
+	wg.Wait()
 }

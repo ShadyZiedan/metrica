@@ -25,7 +25,11 @@ func (h *MetricHandler) UpdateMetricHandler(w http.ResponseWriter, r *http.Reque
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		metric.UpdateCounter(num)
+		err = h.repository.UpdateCounter(metric.Name, num)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		return
 	case "gauge":
 		num, err := strconv.ParseFloat(metricValue, 64)
@@ -33,7 +37,11 @@ func (h *MetricHandler) UpdateMetricHandler(w http.ResponseWriter, r *http.Reque
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		metric.UpdateGauge(num)
+		err = h.repository.UpdateGauge(metric.Name, num)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		return
 	default:
 		http.Error(w, "unknown metric type", http.StatusBadRequest)

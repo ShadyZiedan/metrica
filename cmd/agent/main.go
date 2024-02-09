@@ -10,9 +10,9 @@ import (
 )
 
 func main() {
-	cnf := config.ParseConfig()
+	conf := config.ParseConfig()
 
-	newAgent := agent.NewAgent("http://"+cnf.Address, cnf.PollInterval, cnf.ReportInterval)
+	newAgent := agent.NewAgent("http://"+conf.Address, conf.PollInterval, conf.ReportInterval)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	newAgent.Run(ctx)

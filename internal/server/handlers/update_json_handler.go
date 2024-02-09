@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
-	"github.com/shadyziedan/metrica/internal/models"
+	"fmt"
 	"net/http"
+
+	"github.com/shadyziedan/metrica/internal/models"
 )
 
 func (h *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
@@ -20,11 +22,17 @@ func (h *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 
 	switch data.MType {
 	case "counter":
-		metric.MType = data.MType
-		metric.UpdateCounter(*data.Delta)
+		err := h.repository.UpdateCounter(metric.Name, *data.Delta)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("error updating counter metric: %s", err), http.StatusInternalServerError)
+			return
+		}
 	case "gauge":
-		metric.MType = data.MType
-		metric.UpdateGauge(*data.Value)
+		err := h.repository.UpdateGauge(metric.Name, *data.Value)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("error updating counter metric: %s", err), http.StatusInternalServerError)
+			return
+		}
 	default:
 		http.Error(w, "unknown metric type", http.StatusBadRequest)
 		return

@@ -2,14 +2,12 @@ package server
 
 import (
 	"context"
-	"github.com/go-chi/chi/v5"
+	"errors"
 	"net/http"
 	"time"
-)
 
-//type Server interface {
-//	ListenAndServe(ctx context.Context) error
-//}
+	"github.com/go-chi/chi/v5"
+)
 
 type WebServer struct {
 	http.Server
@@ -17,16 +15,20 @@ type WebServer struct {
 
 func (ws *WebServer) ListenAndServe(ctx context.Context) error {
 	go func() {
-		err := ws.Server.ListenAndServe()
+		<-ctx.Done()
+
+		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		err := ws.Server.Shutdown(shutdownCtx)
 		if err != nil {
-			return
+			panic(err)
 		}
 	}()
-	<-ctx.Done()
-
-	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	return ws.Server.Shutdown(shutdownCtx)
+	err := ws.Server.ListenAndServe()
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
 }
 
 func NewWebServer(host string, router chi.Router) *WebServer {

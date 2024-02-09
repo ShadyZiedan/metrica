@@ -4,13 +4,28 @@ import (
 	"sync"
 
 	"github.com/go-errors/errors"
-	"github.com/shadyziedan/metrica/internal/models"
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
+
+	"github.com/shadyziedan/metrica/internal/models"
 )
 
 type MemStorage struct {
-	storage map[string]*models.Metric
-	m       sync.RWMutex
+	storage          map[string]*models.Metric
+	m                sync.RWMutex
+	metricsObservers []MetricsObserver
+}
+
+type MetricsObserver = chan<- *models.Metric
+
+func (s *MemStorage) Attach(observer MetricsObserver) {
+	s.metricsObservers = append(s.metricsObservers, observer)
+}
+
+func (s *MemStorage) Detach(observer MetricsObserver) {
+	slices.DeleteFunc(s.metricsObservers, func(o MetricsObserver) bool {
+		return o == observer
+	})
 }
 
 var (
@@ -54,6 +69,33 @@ func (s *MemStorage) Find(name string) (*models.Metric, error) {
 		return v, nil
 	}
 	return nil, ErrMetricNotFound
+}
+
+func (s *MemStorage) UpdateCounter(name string, delta int64) error {
+	model, err := s.Find(name)
+	if err != nil {
+		return err
+	}
+	model.MType = "counter"
+	model.UpdateCounter(delta)
+	return s.notify(model)
+}
+
+func (s *MemStorage) UpdateGauge(name string, value float64) error {
+	model, err := s.Find(name)
+	if err != nil {
+		return err
+	}
+	model.MType = "gauge"
+	model.UpdateGauge(value)
+	return s.notify(model)
+}
+
+func (s *MemStorage) notify(model *models.Metric) error {
+	for _, observer := range s.metricsObservers {
+		observer <- model
+	}
+	return nil
 }
 
 func NewMemStorage() *MemStorage {

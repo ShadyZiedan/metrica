@@ -6,10 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/shadyziedan/metrica/internal/models"
 	"time"
 
+	"github.com/shadyziedan/metrica/internal/models"
+
 	"github.com/go-resty/resty/v2"
+
 	"github.com/shadyziedan/metrica/internal/agent/services"
 )
 
@@ -79,7 +81,7 @@ func (a *Agent) sendMetricsToServer(ctx context.Context, metrics *services.Agent
 func (a Agent) sendMetric(ctx context.Context, model *models.Metrics) error {
 	body, err := marshallAndCompressMetric(model)
 	if err != nil {
-		return err
+		return fmt.Errorf("error marshalling and compressing model: %s", err)
 	}
 	_, err = a.Client.R().SetContext(ctx).
 		SetHeader("Content-Encoding", "gzip").

@@ -1,10 +1,12 @@
 package middleware
 
 import (
-	"github.com/shadyziedan/metrica/internal/server/logger"
-	"go.uber.org/zap"
 	"net/http"
 	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/shadyziedan/metrica/internal/server/logger"
 )
 
 type (
@@ -46,20 +48,19 @@ func RequestLogger(next http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 
 		loggerRw := newLoggerResponseWriter(w)
-		duration := time.Duration(0)
+		timeStart := time.Now()
 		defer func() {
 			logger.Log.Info(
 				"incoming request",
 				zap.String("method", r.Method),
 				zap.String("uri", r.RequestURI),
 				zap.Int("status", loggerRw.responseData.status),
-				zap.String("duration", duration.String()),
+				zap.String("duration", time.Since(timeStart).String()),
 				zap.Int("response size", loggerRw.responseData.size),
 			)
 		}()
-		timeStart := time.Now()
+
 		next.ServeHTTP(loggerRw, r)
-		duration = time.Since(timeStart)
 
 	}
 	return http.HandlerFunc(logFn)
