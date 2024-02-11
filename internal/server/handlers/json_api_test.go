@@ -1,14 +1,16 @@
 package handlers
 
 import (
-	"github.com/shadyziedan/metrica/internal/server/storage"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/shadyziedan/metrica/internal/server/storage"
 )
 
 func TestJSONApi(t *testing.T) {
@@ -161,7 +163,7 @@ func TestJSONApi(t *testing.T) {
 	}
 
 	memStorage := storage.NewMemStorage()
-	router := NewRouter(memStorage)
+	router := NewRouter(nil, memStorage)
 	srv := httptest.NewServer(router)
 	defer srv.Close()
 	client := &http.Client{}
