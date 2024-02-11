@@ -43,14 +43,14 @@ func newConsumer(fileName string) (*consumer, error) {
 type Mode string
 
 const (
-	Async  Mode = "async"
+	Sync   Mode = "sync"
 	Normal Mode = "normal"
 )
 
 func newProducer(fileName string, mode Mode) (*producer, error) {
 	var flag int
 	switch mode {
-	case Async:
+	case Sync:
 		flag = os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	case Normal:
 		flag = os.O_WRONLY | os.O_CREATE

@@ -1,9 +1,14 @@
 package handlers
 
-import "github.com/shadyziedan/metrica/internal/models"
+import (
+	"github.com/jackc/pgx/v5"
+
+	"github.com/shadyziedan/metrica/internal/models"
+)
 
 type MetricHandler struct {
 	repository metricsRepository
+	conn       *pgx.Conn
 }
 
 type metricsRepository interface {
@@ -15,6 +20,6 @@ type metricsRepository interface {
 	UpdateGauge(name string, value float64) error
 }
 
-func NewMetricHandler(repository metricsRepository) *MetricHandler {
-	return &MetricHandler{repository: repository}
+func NewMetricHandler(conn *pgx.Conn, repository metricsRepository) *MetricHandler {
+	return &MetricHandler{repository: repository, conn: conn}
 }

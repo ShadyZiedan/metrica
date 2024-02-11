@@ -16,7 +16,9 @@ type MemStorage struct {
 	metricsObservers []MetricsObserver
 }
 
-type MetricsObserver = chan<- *models.Metric
+type MetricsObserver interface {
+	Notify(*models.Metric) error
+}
 
 func (s *MemStorage) Attach(observer MetricsObserver) {
 	s.metricsObservers = append(s.metricsObservers, observer)
@@ -92,8 +94,11 @@ func (s *MemStorage) UpdateGauge(name string, value float64) error {
 }
 
 func (s *MemStorage) notify(model *models.Metric) error {
-	for _, observer := range s.metricsObservers {
-		observer <- model
+	for _, metricsObserver := range s.metricsObservers {
+		err := metricsObserver.Notify(model)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

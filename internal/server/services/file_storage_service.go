@@ -31,7 +31,7 @@ type FileStorageService struct {
 func NewFileStorageService(metricsRepository metricsRepository, conf FileStorageServiceConfig) *FileStorageService {
 	var mode storage.Mode
 	if conf.StoreInterval == 0 {
-		mode = storage.Async
+		mode = storage.Sync
 	} else {
 		mode = storage.Normal
 	}
@@ -53,20 +53,10 @@ func (s *FileStorageService) Run(ctx context.Context) {
 		}
 	}
 
-	if s.conf.StoreInterval == 0 { //Async mode
-		observer := s.Observe()
-		defer s.Stop()
-		for {
-			select {
-			case metric := <-observer:
-				err := s.saveMetric(metric)
-				if err != nil {
-					panic(err)
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
+	if s.conf.StoreInterval == 0 { //Sync mode
+		s.Observe()
+		<-ctx.Done()
+		return
 	}
 
 	updateStorageTicker := time.NewTicker(time.Duration(s.conf.StoreInterval) * time.Second)
@@ -85,7 +75,7 @@ func (s *FileStorageService) Run(ctx context.Context) {
 	}
 }
 
-func (s *FileStorageService) saveMetric(metric *models.Metric) error {
+func (s *FileStorageService) Notify(metric *models.Metric) error {
 	model := &models.Metrics{
 		ID:    metric.Name,
 		MType: metric.MType,
@@ -134,11 +124,8 @@ func (s *FileStorageService) restoreRepository() error {
 	return nil
 }
 
-func (s *FileStorageService) Observe() <-chan *models.Metric {
-	c := make(chan *models.Metric)
-	s.metricsRepository.Attach(c)
-	s.observer = c
-	return c
+func (s *FileStorageService) Observe() {
+	s.metricsRepository.Attach(s)
 }
 
 func (s *FileStorageService) Stop() {
