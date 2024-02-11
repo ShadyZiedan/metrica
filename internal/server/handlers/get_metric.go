@@ -18,10 +18,10 @@ func (h *MetricHandler) GetMetric(rw http.ResponseWriter, r *http.Request) {
 	}
 	switch metricType {
 	case "counter":
-		io.WriteString(rw, fmt.Sprintf("%v", metric.GetCounter()))
+		io.WriteString(rw, fmt.Sprintf("%v", metric.Counter))
 		return
 	case "gauge":
-		io.WriteString(rw, fmt.Sprintf("%v", metric.GetGauge()))
+		io.WriteString(rw, fmt.Sprintf("%v", metric.Gauge))
 		return
 	default:
 		http.Error(rw, "unknown metric type: "+metricType, http.StatusNotFound)

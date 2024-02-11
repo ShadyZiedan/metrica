@@ -10,10 +10,10 @@ import (
 )
 
 func main() {
-	config := config.ParseConfig()
+	conf := config.ParseConfig()
 
-	agent := agent.NewAgent("http://"+config.Address, config.PollInterval, config.ReportInterval)
+	newAgent := agent.NewAgent("http://"+conf.Address, conf.PollInterval, conf.ReportInterval)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	agent.Run(ctx)
+	newAgent.Run(ctx)
 }

@@ -44,6 +44,8 @@ func (mc *MerticsCollector) Collect() *AgentMetrics {
 	metrics.Gauge.UpdateMetric("StackSys", float64(stats.StackSys))
 	metrics.Gauge.UpdateMetric("Sys", float64(stats.Sys))
 	metrics.Gauge.UpdateMetric("TotalAlloc", float64(stats.TotalAlloc))
+	metrics.Gauge.UpdateMetric("MSpanInuse", float64(stats.MSpanInuse))
+	metrics.Gauge.UpdateMetric("MSpanSys", float64(stats.MSpanSys))
 
 	metrics.Gauge.UpdateMetric("RandomValue", rand.Float64())
 

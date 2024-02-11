@@ -137,8 +137,8 @@ func TestHandlers(t *testing.T) {
 			if !tt.want.err {
 				metric, err := memStorage.Find(tt.metricName)
 				require.NoError(t, err)
-				assert.Equal(t, tt.want.counter, metric.GetCounter())
-				assert.Equal(t, tt.want.gauge, metric.GetGauge())
+				assert.Equal(t, tt.want.counter, metric.Counter)
+				assert.Equal(t, tt.want.gauge, metric.Gauge)
 			}
 		})
 	}

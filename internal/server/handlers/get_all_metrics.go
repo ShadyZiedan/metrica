@@ -29,6 +29,8 @@ func (h *MetricHandler) GetAll(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rw.Header().Set("Content-Type", "text/html")
+
 	t := template.Must(template.New("tmpl").Parse(getAllMetricsTemplate))
 
 	t.Execute(rw, metrics)
