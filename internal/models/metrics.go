@@ -12,8 +12,8 @@ func (m *Metrics) ParseMetricModel(model Metric) {
 	m.MType = model.MType
 	switch model.MType {
 	case "counter":
-		m.Delta = &model.Counter
+		m.Delta = model.Counter
 	case "gauge":
-		m.Value = &model.Gauge
+		m.Value = model.Gauge
 	}
 }

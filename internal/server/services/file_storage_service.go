@@ -9,8 +9,8 @@ import (
 )
 
 type metricsRepository interface {
-	FindOrCreate(name string) (*models.Metric, error)
-	FindAll() ([]*models.Metric, error)
+	FindOrCreate(ctx context.Context, name string, mType string) (*models.Metric, error)
+	FindAll(ctx context.Context) ([]*models.Metric, error)
 	Attach(observer storage.MetricsObserver)
 	Detach(observer storage.MetricsObserver)
 }
@@ -25,7 +25,6 @@ type FileStorageService struct {
 	conf              FileStorageServiceConfig
 	fileStorage       fileStorage
 	metricsRepository metricsRepository
-	observer          chan *models.Metric
 }
 
 func NewFileStorageService(metricsRepository metricsRepository, conf FileStorageServiceConfig) *FileStorageService {
@@ -47,7 +46,7 @@ type FileStorageServiceConfig struct {
 
 func (s *FileStorageService) Run(ctx context.Context) {
 	if s.conf.Restore {
-		err := s.restoreRepository()
+		err := s.restoreRepository(ctx)
 		if err != nil {
 			panic(err)
 		}
@@ -56,6 +55,7 @@ func (s *FileStorageService) Run(ctx context.Context) {
 	if s.conf.StoreInterval == 0 { //Sync mode
 		s.Observe()
 		<-ctx.Done()
+		s.StopObserving()
 		return
 	}
 
@@ -65,7 +65,7 @@ func (s *FileStorageService) Run(ctx context.Context) {
 	for {
 		select {
 		case <-updateStorageTicker.C:
-			err := s.updateStorage()
+			err := s.updateStorage(ctx)
 			if err != nil {
 				panic(err)
 			}
@@ -79,8 +79,8 @@ func (s *FileStorageService) Notify(metric *models.Metric) error {
 	model := &models.Metrics{
 		ID:    metric.Name,
 		MType: metric.MType,
-		Delta: &metric.Counter,
-		Value: &metric.Gauge,
+		Delta: metric.Counter,
+		Value: metric.Gauge,
 	}
 	err := s.fileStorage.SaveMetric(model)
 	if err != nil {
@@ -89,8 +89,8 @@ func (s *FileStorageService) Notify(metric *models.Metric) error {
 	return nil
 }
 
-func (s *FileStorageService) updateStorage() error {
-	metrics, err := s.metricsRepository.FindAll()
+func (s *FileStorageService) updateStorage(ctx context.Context) error {
+	metrics, err := s.metricsRepository.FindAll(ctx)
 	if err != nil {
 		return err
 	}
@@ -99,27 +99,27 @@ func (s *FileStorageService) updateStorage() error {
 		model := &models.Metrics{
 			ID:    metric.Name,
 			MType: metric.MType,
-			Delta: &metric.Counter,
-			Value: &metric.Gauge,
+			Delta: metric.Counter,
+			Value: metric.Gauge,
 		}
 		jsonModels = append(jsonModels, model)
 	}
 	return s.fileStorage.SaveMetrics(jsonModels)
 }
 
-func (s *FileStorageService) restoreRepository() error {
+func (s *FileStorageService) restoreRepository(ctx context.Context) error {
 	metrics, err := s.fileStorage.ReadMetrics()
 	if err != nil {
 		return err
 	}
 	for _, metric := range metrics {
-		model, err := s.metricsRepository.FindOrCreate(metric.ID)
+		model, err := s.metricsRepository.FindOrCreate(ctx, metric.ID, metric.MType)
 		if err != nil {
 			return err
 		}
 		model.MType = metric.MType
-		model.Gauge = *metric.Value
-		model.Counter = *metric.Delta
+		model.Gauge = metric.Value
+		model.Counter = metric.Delta
 	}
 	return nil
 }
@@ -128,6 +128,6 @@ func (s *FileStorageService) Observe() {
 	s.metricsRepository.Attach(s)
 }
 
-func (s *FileStorageService) Stop() {
-	close(s.observer)
+func (s *FileStorageService) StopObserving() {
+	s.metricsRepository.Detach(s)
 }

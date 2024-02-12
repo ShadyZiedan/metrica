@@ -2,8 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
-	"github.com/shadyziedan/metrica/internal/models"
 	"net/http"
+
+	"github.com/shadyziedan/metrica/internal/models"
 )
 
 func (h *MetricHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
@@ -12,7 +13,7 @@ func (h *MetricHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid data format", http.StatusBadRequest)
 		return
 	}
-	metric, err := h.repository.Find(data.ID)
+	metric, err := h.repository.Find(r.Context(), data.ID)
 	if err != nil {
 		http.Error(w, "metric not found", http.StatusNotFound)
 		return

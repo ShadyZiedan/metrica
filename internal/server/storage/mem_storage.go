@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"sync"
 
 	"github.com/go-errors/errors"
@@ -37,44 +38,44 @@ var (
 )
 
 // FindAll implements MetricsRepository.
-func (s *MemStorage) FindAll() ([]*models.Metric, error) {
+func (s *MemStorage) FindAll(ctx context.Context) ([]*models.Metric, error) {
 	s.m.RLock()
 	defer s.m.RUnlock()
 	return maps.Values(s.storage), nil
 }
 
 // FindOrCreate implements MetricsRepository.
-func (s *MemStorage) FindOrCreate(name string) (*models.Metric, error) {
-	if metric, err := s.Find(name); err == nil {
+func (s *MemStorage) FindOrCreate(ctx context.Context, name string, mType string) (*models.Metric, error) {
+	if metric, err := s.Find(ctx, name); err == nil {
 		return metric, nil
 	}
-	if err := s.Create(name); err != nil {
+	if err := s.Create(ctx, name, mType); err != nil {
 		return nil, ErrMetricNotCreated
 	}
-	return s.Find(name)
+	return s.Find(ctx, name)
 }
 
 // Create implements MetricsRepository.
-func (s *MemStorage) Create(name string) error {
+func (s *MemStorage) Create(ctx context.Context, name string, mType string) error {
 	s.m.Lock()
 	defer s.m.Unlock()
-	if _, err := s.Find(name); err == nil {
+	if _, err := s.Find(ctx, name); err == nil {
 		return ErrMetricAlreadyExists
 	}
-	s.storage[name] = &models.Metric{Name: name}
+	s.storage[name] = &models.Metric{Name: name, MType: mType}
 	return nil
 }
 
 // Find implements MetricsRepository.
-func (s *MemStorage) Find(name string) (*models.Metric, error) {
+func (s *MemStorage) Find(ctx context.Context, name string) (*models.Metric, error) {
 	if v, ok := s.storage[name]; ok {
 		return v, nil
 	}
 	return nil, ErrMetricNotFound
 }
 
-func (s *MemStorage) UpdateCounter(name string, delta int64) error {
-	model, err := s.Find(name)
+func (s *MemStorage) UpdateCounter(ctx context.Context, name string, delta int64) error {
+	model, err := s.Find(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -83,8 +84,8 @@ func (s *MemStorage) UpdateCounter(name string, delta int64) error {
 	return s.notify(model)
 }
 
-func (s *MemStorage) UpdateGauge(name string, value float64) error {
-	model, err := s.Find(name)
+func (s *MemStorage) UpdateGauge(ctx context.Context, name string, value float64) error {
+	model, err := s.Find(ctx, name)
 	if err != nil {
 		return err
 	}

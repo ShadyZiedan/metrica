@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -136,10 +137,14 @@ func TestHandlers(t *testing.T) {
 			assert.Equal(t, tt.want.statusCode, res.StatusCode)
 
 			if !tt.want.err {
-				metric, err := memStorage.Find(tt.metricName)
+				metric, err := memStorage.Find(context.Background(), tt.metricName)
 				require.NoError(t, err)
-				assert.Equal(t, tt.want.counter, metric.Counter)
-				assert.Equal(t, tt.want.gauge, metric.Gauge)
+				if tt.want.counter != 0 {
+					assert.Equal(t, tt.want.counter, *metric.Counter)
+				}
+				if tt.want.gauge != 0 {
+					assert.Equal(t, tt.want.gauge, *metric.Gauge)
+				}
 			}
 		})
 	}
