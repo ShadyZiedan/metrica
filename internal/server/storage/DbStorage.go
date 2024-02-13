@@ -13,12 +13,27 @@ import (
 	"github.com/shadyziedan/metrica/internal/server/logger"
 )
 
-type DbStorage struct {
+type DBStorage struct {
 	conn      *pgx.Conn
 	observers []MetricsObserver
 }
 
-func (db *DbStorage) Find(ctx context.Context, name string) (*models.Metric, error) {
+func NewDBStorage(conn *pgx.Conn) (*DBStorage, error) {
+	_, err := conn.Exec(context.Background(), `create table if not exists metrics
+(
+    id      serial,
+    name    varchar not null,
+    m_type  varchar not null,
+    counter integer,
+    gauge   decimal
+)`)
+	if err != nil {
+		return nil, err
+	}
+	return &DBStorage{conn: conn}, nil
+}
+
+func (db *DBStorage) Find(ctx context.Context, name string) (*models.Metric, error) {
 	row := db.conn.QueryRow(ctx, `SELECT name, m_type, gauge, counter FROM metrics WHERE name = $1;`, name)
 	var metric models.Metric
 	err := row.Scan(&metric.Name, &metric.MType, &metric.Gauge, &metric.Counter)
@@ -28,7 +43,7 @@ func (db *DbStorage) Find(ctx context.Context, name string) (*models.Metric, err
 	return &metric, err
 }
 
-func (db *DbStorage) Create(ctx context.Context, name string, mType string) error {
+func (db *DBStorage) Create(ctx context.Context, name string, mType string) error {
 	_, err := db.conn.Exec(ctx, `INSERT INTO metrics (name, m_type) values ($1, $2)`, name, mType)
 	if err != nil {
 		return err
@@ -36,7 +51,7 @@ func (db *DbStorage) Create(ctx context.Context, name string, mType string) erro
 	return nil
 }
 
-func (db *DbStorage) UpdateCounter(ctx context.Context, name string, delta int64) error {
+func (db *DBStorage) UpdateCounter(ctx context.Context, name string, delta int64) error {
 	_, err := db.conn.Exec(ctx, `UPDATE metrics set counter = $1 where name = $2`, delta, name)
 	if err != nil {
 		return err
@@ -44,7 +59,7 @@ func (db *DbStorage) UpdateCounter(ctx context.Context, name string, delta int64
 	return nil
 }
 
-func (db *DbStorage) UpdateGauge(ctx context.Context, name string, value float64) error {
+func (db *DBStorage) UpdateGauge(ctx context.Context, name string, value float64) error {
 	_, err := db.conn.Exec(ctx, `UPDATE metrics set gauge = $1 where name = $2`, value, name)
 	if err != nil {
 		return err
@@ -52,7 +67,7 @@ func (db *DbStorage) UpdateGauge(ctx context.Context, name string, value float64
 	return nil
 }
 
-func (db *DbStorage) FindOrCreate(ctx context.Context, name string, mType string) (*models.Metric, error) {
+func (db *DBStorage) FindOrCreate(ctx context.Context, name string, mType string) (*models.Metric, error) {
 	metric, err := db.Find(ctx, name)
 	defer func() {
 		if err != nil && err != sql.ErrNoRows {
@@ -75,7 +90,7 @@ func (db *DbStorage) FindOrCreate(ctx context.Context, name string, mType string
 	return metric, nil
 }
 
-func (db *DbStorage) FindAll(ctx context.Context) ([]*models.Metric, error) {
+func (db *DBStorage) FindAll(ctx context.Context) ([]*models.Metric, error) {
 	rows, err := db.conn.Query(ctx, `SELECT name, m_type, gauge, counter FROM metrics`)
 	if err != nil {
 		return nil, err
@@ -93,27 +108,12 @@ func (db *DbStorage) FindAll(ctx context.Context) ([]*models.Metric, error) {
 	return metrics, err
 }
 
-func (db *DbStorage) Attach(observer MetricsObserver) {
+func (db *DBStorage) Attach(observer MetricsObserver) {
 	db.observers = append(db.observers, observer)
 }
 
-func (db *DbStorage) Detach(observer MetricsObserver) {
+func (db *DBStorage) Detach(observer MetricsObserver) {
 	db.observers = slices.DeleteFunc(db.observers, func(o2 MetricsObserver) bool {
 		return o2 == observer
 	})
-}
-
-func NewDbStorage(conn *pgx.Conn) (*DbStorage, error) {
-	_, err := conn.Exec(context.Background(), `create table if not exists metrics
-(
-    id      serial,
-    name    varchar not null,
-    m_type  varchar not null,
-    counter integer,
-    gauge   decimal
-)`)
-	if err != nil {
-		return nil, err
-	}
-	return &DbStorage{conn: conn}, nil
 }

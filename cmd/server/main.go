@@ -45,7 +45,7 @@ func main() {
 	var appStorage metricsRepository
 
 	if conn != nil {
-		appStorage, err = storage.NewDbStorage(conn)
+		appStorage, err = storage.NewDBStorage(conn)
 		if err != nil {
 			logger.Log.Error("unable to initialize db", zap.Error(err))
 			panic(err)
