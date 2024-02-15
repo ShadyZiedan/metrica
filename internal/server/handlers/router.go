@@ -21,5 +21,6 @@ func NewRouter(conn *pgx.Conn, repo metricsRepository, middlewares ...middleware
 	//json api
 	r.Post(`/update/`, metricsHandler.UpdateJSON)
 	r.Post(`/value/`, metricsHandler.GetMetricJSON)
+	r.Post(`/updates/`, metricsHandler.UpdateBatch)
 	return r
 }

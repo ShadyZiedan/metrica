@@ -24,7 +24,7 @@ func NewDBStorage(conn *pgx.Conn) (*DBStorage, error) {
     id      serial,
     name    varchar not null,
     m_type  varchar not null,
-    counter integer,
+    counter bigint,
     gauge   decimal
 )`)
 	if err != nil {
@@ -52,11 +52,25 @@ func (db *DBStorage) Create(ctx context.Context, name string, mType string) erro
 }
 
 func (db *DBStorage) UpdateCounter(ctx context.Context, name string, delta int64) error {
-	_, err := db.conn.Exec(ctx, `UPDATE metrics set counter = $1 where name = $2`, delta, name)
+	tx, err := db.conn.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	return nil
+	defer tx.Rollback(ctx)
+	var prevCounter int64
+	row := tx.QueryRow(ctx, `SELECT coalesce(counter, 0) FROM metrics where name = $1`, name)
+	err = row.Scan(&prevCounter)
+	if err != nil {
+		logger.Log.Error("Error getting counter", zap.Error(err))
+		return err
+	}
+
+	_, err = tx.Exec(ctx, `UPDATE metrics set counter = $1 where name = $2`, prevCounter+delta, name)
+	if err != nil {
+		logger.Log.Error("Error updating counter", zap.Error(err))
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (db *DBStorage) UpdateGauge(ctx context.Context, name string, value float64) error {

@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/shadyziedan/metrica/internal/agent/logger"
 	"github.com/shadyziedan/metrica/internal/models"
 
 	"github.com/go-resty/resty/v2"
@@ -44,7 +47,10 @@ func (a *Agent) Run(ctx context.Context) {
 			mc.IncreasePollCount()
 		case <-reportChan.C:
 			metrics := mc.Collect()
-			a.sendMetricsToServer(ctx, metrics)
+			err := a.sendMetricsToServer(ctx, metrics)
+			if err != nil {
+				logger.Log.Error("Error sending metric", zap.Error(err))
+			}
 		case <-ctx.Done():
 			return
 		}
@@ -52,45 +58,40 @@ func (a *Agent) Run(ctx context.Context) {
 }
 
 func (a *Agent) sendMetricsToServer(ctx context.Context, metrics *services.AgentMetrics) error {
-	timeoutCtx, cancel := context.WithTimeout(ctx, ClientTimeout*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, ClientTimeout*time.Second)
 	defer cancel()
+	var requestModels []*models.Metrics
 	for _, metric := range metrics.Gauge.GetAll() {
-		model := &models.Metrics{
+		requestModels = append(requestModels, &models.Metrics{
 			ID:    metric.Name,
 			MType: "gauge",
 			Value: &metric.Value,
-		}
-		if err := a.sendMetric(timeoutCtx, model); err != nil {
-			return fmt.Errorf("update gauge '%s'->'%v': %w", metric.Name, metric.Value, err)
-		}
+		})
 	}
 	for _, metric := range metrics.Counter.GetAll() {
 		delta := int64(metric.Value)
-		model := &models.Metrics{
+		requestModels = append(requestModels, &models.Metrics{
 			ID:    metric.Name,
 			MType: "counter",
 			Delta: &delta,
-		}
-		if err := a.sendMetric(timeoutCtx, model); err != nil {
-			return fmt.Errorf("update counter '%s'->'%v': %w", metric.Name, metric.Value, err)
-		}
+		})
 	}
-	return nil
+	return a.sendMetrics(ctx, requestModels)
 }
 
-func (a Agent) sendMetric(ctx context.Context, model *models.Metrics) error {
-	body, err := marshallAndCompressMetric(model)
+func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) error {
+	body, err := marshallAndCompressMetrics(metrics)
 	if err != nil {
 		return fmt.Errorf("error marshalling and compressing model: %s", err)
 	}
 	_, err = a.Client.R().SetContext(ctx).
 		SetHeader("Content-Encoding", "gzip").
 		SetHeader("Content-Type", "application/json").
-		SetBody(body).Post("/update/")
+		SetBody(body).Post("/updates/")
 	return err
 }
 
-func marshallAndCompressMetric(m *models.Metrics) ([]byte, error) {
+func marshallAndCompressMetrics(m []*models.Metrics) ([]byte, error) {
 	jsonEncoded, err := json.Marshal(m)
 	if err != nil {
 		return nil, err
