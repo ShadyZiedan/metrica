@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/shadyziedan/metrica/internal/models"
+	"github.com/shadyziedan/metrica/internal/utils"
 )
 
 type FileStorage struct {
@@ -55,7 +56,14 @@ func newProducer(fileName string, mode Mode) (*producer, error) {
 	case Normal:
 		flag = os.O_WRONLY | os.O_CREATE
 	}
-	file, err := os.OpenFile(fileName, flag, 0666)
+	var file *os.File
+	err := utils.RetryWithBackoff(3, func(err error) bool {
+		return err != nil
+	}, func() error {
+		var openErr error
+		file, openErr = os.OpenFile(fileName, flag, 0666)
+		return openErr
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -4,12 +4,11 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5"
 )
 
 type middleware = func(http.Handler) http.Handler
 
-func NewRouter(conn *pgx.Conn, repo metricsRepository, middlewares ...middleware) chi.Router {
+func NewRouter(conn dbConnection, repo metricsRepository, middlewares ...middleware) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middlewares...)
 	metricsHandler := NewMetricHandler(conn, repo)

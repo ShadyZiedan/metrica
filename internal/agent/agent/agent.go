@@ -6,12 +6,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 
+	"github.com/go-errors/errors"
 	"go.uber.org/zap"
 
 	"github.com/shadyziedan/metrica/internal/agent/logger"
 	"github.com/shadyziedan/metrica/internal/models"
+	"github.com/shadyziedan/metrica/internal/utils"
 
 	"github.com/go-resty/resty/v2"
 
@@ -47,7 +50,12 @@ func (a *Agent) Run(ctx context.Context) {
 			mc.IncreasePollCount()
 		case <-reportChan.C:
 			metrics := mc.Collect()
-			err := a.sendMetricsToServer(ctx, metrics)
+			err := utils.RetryWithBackoff(3, func(err error) bool {
+				var e net.Error
+				return errors.As(err, &e)
+			}, func() error {
+				return a.sendMetricsToServer(ctx, metrics)
+			})
 			if err != nil {
 				logger.Log.Error("Error sending metric", zap.Error(err))
 			}

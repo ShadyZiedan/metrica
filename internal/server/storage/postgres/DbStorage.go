@@ -1,4 +1,4 @@
-package storage
+package postgres
 
 import (
 	"context"
@@ -6,20 +6,30 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 
 	"github.com/shadyziedan/metrica/internal/models"
 	"github.com/shadyziedan/metrica/internal/server/logger"
+	"github.com/shadyziedan/metrica/internal/server/storage"
 )
 
 type DBStorage struct {
-	conn      *pgx.Conn
-	observers []MetricsObserver
+	conn      pgConn
+	observers []storage.MetricsObserver
 }
 
-func NewDBStorage(conn *pgx.Conn) (*DBStorage, error) {
-	_, err := conn.Exec(context.Background(), `create table if not exists metrics
+type pgConn interface {
+	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
+func NewDBStorage(conn pgConn) (*DBStorage, error) {
+	postgresConn := &pgConnWrapper{conn: conn}
+	_, err := postgresConn.Exec(context.Background(), `create table if not exists metrics
 (
     id      serial,
     name    varchar not null,
@@ -30,7 +40,7 @@ func NewDBStorage(conn *pgx.Conn) (*DBStorage, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DBStorage{conn: conn}, nil
+	return &DBStorage{conn: postgresConn}, nil
 }
 
 func (db *DBStorage) Find(ctx context.Context, name string) (*models.Metric, error) {
@@ -122,12 +132,12 @@ func (db *DBStorage) FindAll(ctx context.Context) ([]*models.Metric, error) {
 	return metrics, err
 }
 
-func (db *DBStorage) Attach(observer MetricsObserver) {
+func (db *DBStorage) Attach(observer storage.MetricsObserver) {
 	db.observers = append(db.observers, observer)
 }
 
-func (db *DBStorage) Detach(observer MetricsObserver) {
-	db.observers = slices.DeleteFunc(db.observers, func(o2 MetricsObserver) bool {
+func (db *DBStorage) Detach(observer storage.MetricsObserver) {
+	db.observers = slices.DeleteFunc(db.observers, func(o2 storage.MetricsObserver) bool {
 		return o2 == observer
 	})
 }

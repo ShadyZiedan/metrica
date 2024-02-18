@@ -4,7 +4,10 @@ import (
 	"context"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/shadyziedan/metrica/internal/models"
+	"github.com/shadyziedan/metrica/internal/server/logger"
 	"github.com/shadyziedan/metrica/internal/server/storage"
 )
 
@@ -67,7 +70,7 @@ func (s *FileStorageService) Run(ctx context.Context) {
 		case <-updateStorageTicker.C:
 			err := s.updateStorage(ctx)
 			if err != nil {
-				panic(err)
+				logger.Log.Error("Failed to update metrics storage", zap.Error(err))
 			}
 		case <-ctx.Done():
 			return

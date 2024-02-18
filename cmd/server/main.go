@@ -7,7 +7,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/shadyziedan/metrica/internal/models"
@@ -18,6 +18,7 @@ import (
 	"github.com/shadyziedan/metrica/internal/server/server"
 	"github.com/shadyziedan/metrica/internal/server/services"
 	"github.com/shadyziedan/metrica/internal/server/storage"
+	"github.com/shadyziedan/metrica/internal/server/storage/postgres"
 )
 
 type metricsRepository interface {
@@ -36,16 +37,16 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	conn, err := pgx.Connect(ctx, cnf.DatabaseDsn)
+	conn, err := pgxpool.New(ctx, cnf.DatabaseDsn)
 	if err != nil {
 		logger.Log.Error("Unable to establish db connection")
 	} else {
-		defer conn.Close(ctx)
+		defer conn.Close()
 	}
 	var appStorage metricsRepository
 
 	if conn != nil {
-		appStorage, err = storage.NewDBStorage(conn)
+		appStorage, err = postgres.NewDBStorage(conn)
 		if err != nil {
 			logger.Log.Error("unable to initialize db", zap.Error(err))
 			panic(err)

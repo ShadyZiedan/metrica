@@ -3,14 +3,16 @@ package handlers
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/shadyziedan/metrica/internal/models"
 )
 
 type MetricHandler struct {
 	repository metricsRepository
-	conn       *pgx.Conn
+	conn       dbConnection
+}
+
+type dbConnection interface {
+	Ping(ctx context.Context) error
 }
 
 type metricsRepository interface {
@@ -22,6 +24,6 @@ type metricsRepository interface {
 	UpdateGauge(ctx context.Context, name string, value float64) error
 }
 
-func NewMetricHandler(conn *pgx.Conn, repository metricsRepository) *MetricHandler {
+func NewMetricHandler(conn dbConnection, repository metricsRepository) *MetricHandler {
 	return &MetricHandler{repository: repository, conn: conn}
 }
