@@ -37,9 +37,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	err := logger.Initialize("info")
+	if err != nil {
+		panic(err)
+	}
+
 	conn, err := pgxpool.New(ctx, cnf.DatabaseDsn)
 	if err != nil {
-		logger.Log.Error("Unable to establish db connection")
+		logger.Log.Error("Unable to create connection pool", zap.Error(err))
 	} else {
 		defer conn.Close()
 	}
@@ -49,7 +54,7 @@ func main() {
 		appStorage, err = postgres.NewDBStorage(conn)
 		if err != nil {
 			logger.Log.Error("unable to initialize db", zap.Error(err))
-			panic(err)
+			appStorage = storage.NewMemStorage()
 		}
 	} else {
 		appStorage = storage.NewMemStorage()
@@ -70,11 +75,6 @@ func main() {
 		defer wg.Done()
 		fileStorageService.Run(ctx)
 	}()
-
-	err = logger.Initialize("info")
-	if err != nil {
-		panic(err)
-	}
 
 	router := handlers.NewRouter(conn, appStorage, middleware.RequestLogger, middleware.Compress)
 	srv := server.NewWebServer(
