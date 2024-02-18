@@ -2,12 +2,12 @@ package postgres
 
 import (
 	"context"
+	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"go.uber.org/zap"
 
-	"github.com/shadyziedan/metrica/internal/server/logger"
 	"github.com/shadyziedan/metrica/internal/utils"
 )
 
@@ -24,10 +24,8 @@ func (p *pgConnWrapper) Exec(ctx context.Context, sql string, arguments ...inter
 }
 
 func isConnectionError(err error) bool {
-	if err != nil {
-		logger.Log.Info("Error getting connection", zap.Error(err))
-	}
-	return err != nil
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && strings.HasPrefix(pgErr.Code, "08")
 }
 
 func (p *pgConnWrapper) Query(ctx context.Context, sql string, args ...interface{}) (res pgx.Rows, err error) {
