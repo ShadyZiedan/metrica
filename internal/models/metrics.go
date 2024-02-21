@@ -7,7 +7,7 @@ type Metrics struct {
 	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи Gauge
 }
 
-func (m *Metrics) ParseMetricModel(model Metric) {
+func (m *Metrics) ParseMetricModel(model *Metric) {
 	m.ID = model.Name
 	m.MType = model.MType
 	switch model.MType {

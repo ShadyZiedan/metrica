@@ -1,13 +1,14 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"os"
 	"sync"
 
 	"github.com/shadyziedan/metrica/internal/models"
-	"github.com/shadyziedan/metrica/internal/utils"
+	"github.com/shadyziedan/metrica/internal/retry"
 )
 
 type FileStorage struct {
@@ -57,7 +58,7 @@ func newProducer(fileName string, mode Mode) (*producer, error) {
 		flag = os.O_WRONLY | os.O_CREATE
 	}
 	var file *os.File
-	err := utils.RetryWithBackoff(3, func(err error) bool {
+	err := retry.WithBackoff(context.Background(), 3, func(err error) bool {
 		return err != nil
 	}, func() error {
 		var openErr error

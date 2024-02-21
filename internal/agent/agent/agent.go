@@ -14,7 +14,7 @@ import (
 
 	"github.com/shadyziedan/metrica/internal/agent/logger"
 	"github.com/shadyziedan/metrica/internal/models"
-	"github.com/shadyziedan/metrica/internal/utils"
+	"github.com/shadyziedan/metrica/internal/retry"
 
 	"github.com/go-resty/resty/v2"
 
@@ -26,8 +26,6 @@ type Agent struct {
 	PollInterval   int
 	ReportInterval int
 }
-
-const ClientTimeout = 5
 
 func NewAgent(baseURL string, pollInterval, reportInterval int) *Agent {
 	client := resty.New()
@@ -50,7 +48,7 @@ func (a *Agent) Run(ctx context.Context) {
 			mc.IncreasePollCount()
 		case <-reportChan.C:
 			metrics := mc.Collect()
-			err := utils.RetryWithBackoff(3, func(err error) bool {
+			err := retry.WithBackoff(ctx, 3, func(err error) bool {
 				var e net.Error
 				return errors.As(err, &e)
 			}, func() error {
@@ -66,8 +64,6 @@ func (a *Agent) Run(ctx context.Context) {
 }
 
 func (a *Agent) sendMetricsToServer(ctx context.Context, metrics *services.AgentMetrics) error {
-	ctx, cancel := context.WithTimeout(ctx, ClientTimeout*time.Second)
-	defer cancel()
 	var requestModels []*models.Metrics
 	for _, metric := range metrics.Gauge.GetAll() {
 		requestModels = append(requestModels, &models.Metrics{

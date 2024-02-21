@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/shadyziedan/metrica/internal/utils"
+	"github.com/shadyziedan/metrica/internal/retry"
 )
 
 type pgConnWrapper struct {
@@ -16,7 +16,7 @@ type pgConnWrapper struct {
 }
 
 func (p *pgConnWrapper) Exec(ctx context.Context, sql string, arguments ...interface{}) (res pgconn.CommandTag, err error) {
-	err = utils.RetryWithBackoff(3, isConnectionError, func() error {
+	err = retry.WithBackoff(ctx, 3, isConnectionError, func() error {
 		res, err = p.conn.Exec(ctx, sql, arguments...)
 		return err
 	})
@@ -29,7 +29,7 @@ func isConnectionError(err error) bool {
 }
 
 func (p *pgConnWrapper) Query(ctx context.Context, sql string, args ...interface{}) (res pgx.Rows, err error) {
-	err = utils.RetryWithBackoff(3, isConnectionError, func() error {
+	err = retry.WithBackoff(ctx, 3, isConnectionError, func() error {
 		res, err = p.conn.Query(ctx, sql, args...)
 		return err
 	})
@@ -41,7 +41,7 @@ func (p *pgConnWrapper) QueryRow(ctx context.Context, sql string, args ...interf
 }
 
 func (p *pgConnWrapper) Begin(ctx context.Context) (tx pgx.Tx, err error) {
-	err = utils.RetryWithBackoff(3, isConnectionError, func() error {
+	err = retry.WithBackoff(ctx, 3, isConnectionError, func() error {
 		tx, err = p.conn.Begin(ctx)
 		return err
 	})

@@ -94,6 +94,21 @@ func (s *MemStorage) UpdateGauge(ctx context.Context, name string, value float64
 	return s.notify(model)
 }
 
+func (s *MemStorage) FindAllByName(ctx context.Context, names []string) ([]*models.Metric, error) {
+	metrics, err := s.FindAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, metric := range metrics {
+		for _, name := range names {
+			if metric.Name == name {
+				metrics = append(metrics, metric)
+			}
+		}
+	}
+	return metrics, nil
+}
+
 func (s *MemStorage) notify(model *models.Metric) error {
 	for _, metricsObserver := range s.metricsObservers {
 		err := metricsObserver.Notify(model)

@@ -15,23 +15,31 @@ func (h *MetricHandler) UpdateBatch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	var response []*models.Metrics
-	for _, datum := range data {
-		metric, err := h.repository.FindOrCreate(ctx, datum.ID, datum.MType)
+	response := make([]*models.Metrics, 0, len(data))
+	for _, item := range data {
+		metric, err := h.repository.FindOrCreate(ctx, item.ID, item.MType)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		switch datum.MType {
+		switch item.MType {
 		case "counter":
-			err := h.repository.UpdateCounter(ctx, metric.Name, *datum.Delta)
+			if item.Delta == nil {
+				http.Error(w, fmt.Sprintf("error updating null counter value metric: %s", err), http.StatusBadRequest)
+				return
+			}
+			err := h.repository.UpdateCounter(ctx, metric.Name, *item.Delta)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("error updating counter metric: %s", err), http.StatusInternalServerError)
 				return
 			}
 		case "gauge":
-			err := h.repository.UpdateGauge(ctx, metric.Name, *datum.Value)
+			if item.Value == nil {
+				http.Error(w, fmt.Sprintf("error updating null gauge value metric: %s", err), http.StatusBadRequest)
+				return
+			}
+			err := h.repository.UpdateGauge(ctx, metric.Name, *item.Value)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("error updating counter metric: %s", err), http.StatusInternalServerError)
 				return
@@ -40,8 +48,13 @@ func (h *MetricHandler) UpdateBatch(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "unknown metric type", http.StatusBadRequest)
 			return
 		}
+		updatedMetric, err := h.repository.Find(ctx, metric.Name)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		responseModel := &models.Metrics{}
-		responseModel.ParseMetricModel(*metric)
+		responseModel.ParseMetricModel(updatedMetric)
 		response = append(response, responseModel)
 	}
 

@@ -2,16 +2,13 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 
 	"github.com/shadyziedan/metrica/internal/models"
-	"github.com/shadyziedan/metrica/internal/server/logger"
 	"github.com/shadyziedan/metrica/internal/server/storage"
 )
 
@@ -29,14 +26,17 @@ type pgConn interface {
 
 func NewDBStorage(conn pgConn) (*DBStorage, error) {
 	postgresConn := &pgConnWrapper{conn: conn}
-	_, err := postgresConn.Exec(context.Background(), `create table if not exists metrics
+	_, err := postgresConn.Exec(context.Background(), `
+create table if not exists metrics
 (
     id      serial,
     name    varchar not null,
     m_type  varchar not null,
     counter bigint,
     gauge   decimal
-)`)
+);
+create unique index if not exists metrics_name_uindex on metrics (name);
+`)
 	if err != nil {
 		return nil, err
 	}
@@ -55,10 +55,7 @@ func (db *DBStorage) Find(ctx context.Context, name string) (*models.Metric, err
 
 func (db *DBStorage) Create(ctx context.Context, name string, mType string) error {
 	_, err := db.conn.Exec(ctx, `INSERT INTO metrics (name, m_type) values ($1, $2)`, name, mType)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (db *DBStorage) UpdateCounter(ctx context.Context, name string, delta int64) error {
@@ -67,17 +64,13 @@ func (db *DBStorage) UpdateCounter(ctx context.Context, name string, delta int64
 		return err
 	}
 	defer tx.Rollback(ctx)
-	var prevCounter int64
-	row := tx.QueryRow(ctx, `SELECT coalesce(counter, 0) FROM metrics where name = $1`, name)
-	err = row.Scan(&prevCounter)
+	_, err = tx.Exec(ctx, `
+        INSERT INTO metrics (name, m_type, counter)
+        VALUES ($1, 'counter', $2)
+        ON CONFLICT (name) DO UPDATE
+        SET counter = coalesce(metrics.counter, 0) + $2
+    `, name, delta)
 	if err != nil {
-		logger.Log.Error("Error getting counter", zap.Error(err))
-		return err
-	}
-
-	_, err = tx.Exec(ctx, `UPDATE metrics set counter = $1 where name = $2`, prevCounter+delta, name)
-	if err != nil {
-		logger.Log.Error("Error updating counter", zap.Error(err))
 		return err
 	}
 	return tx.Commit(ctx)
@@ -93,11 +86,6 @@ func (db *DBStorage) UpdateGauge(ctx context.Context, name string, value float64
 
 func (db *DBStorage) FindOrCreate(ctx context.Context, name string, mType string) (*models.Metric, error) {
 	metric, err := db.Find(ctx, name)
-	defer func() {
-		if err != nil && err != sql.ErrNoRows {
-			logger.Log.Error("find or create", zap.Error(err))
-		}
-	}()
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	} else if err == nil {
@@ -107,11 +95,7 @@ func (db *DBStorage) FindOrCreate(ctx context.Context, name string, mType string
 	if err != nil {
 		return nil, err
 	}
-	metric, err = db.Find(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	return metric, nil
+	return db.Find(ctx, name)
 }
 
 func (db *DBStorage) FindAll(ctx context.Context) ([]*models.Metric, error) {
@@ -119,8 +103,28 @@ func (db *DBStorage) FindAll(ctx context.Context) ([]*models.Metric, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
 	var metrics []*models.Metric
 
+	for rows.Next() {
+		metric := &models.Metric{}
+		err := rows.Scan(&metric.Name, &metric.MType, &metric.Gauge, &metric.Counter)
+		if err != nil {
+			return nil, err
+		}
+		metrics = append(metrics, metric)
+	}
+	return metrics, err
+}
+
+func (db *DBStorage) FindAllByName(ctx context.Context, names []string) ([]*models.Metric, error) {
+	rows, err := db.conn.Query(ctx, `SELECT name, m_type, gauge, counter FROM metrics where name IN ($1)`, names)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	metrics := make([]*models.Metric, 0, len(names))
 	for rows.Next() {
 		metric := &models.Metric{}
 		err := rows.Scan(&metric.Name, &metric.MType, &metric.Gauge, &metric.Counter)

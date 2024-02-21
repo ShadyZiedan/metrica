@@ -22,6 +22,7 @@ type metricsRepository interface {
 	FindAll(ctx context.Context) ([]*models.Metric, error)
 	UpdateCounter(ctx context.Context, name string, delta int64) error
 	UpdateGauge(ctx context.Context, name string, value float64) error
+	FindAllByName(ctx context.Context, names []string) ([]*models.Metric, error)
 }
 
 func NewMetricHandler(conn dbConnection, repository metricsRepository) *MetricHandler {
