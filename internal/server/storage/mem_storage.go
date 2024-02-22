@@ -26,7 +26,7 @@ func (s *MemStorage) Attach(observer MetricsObserver) {
 }
 
 func (s *MemStorage) Detach(observer MetricsObserver) {
-	slices.DeleteFunc(s.metricsObservers, func(o MetricsObserver) bool {
+	s.metricsObservers = slices.DeleteFunc(s.metricsObservers, func(o MetricsObserver) bool {
 		return o == observer
 	})
 }
@@ -81,7 +81,7 @@ func (s *MemStorage) UpdateCounter(ctx context.Context, name string, delta int64
 	}
 	model.MType = "counter"
 	model.UpdateCounter(delta)
-	return s.notify(model)
+	return s.notify(ctx, model)
 }
 
 func (s *MemStorage) UpdateGauge(ctx context.Context, name string, value float64) error {
@@ -91,7 +91,7 @@ func (s *MemStorage) UpdateGauge(ctx context.Context, name string, value float64
 	}
 	model.MType = "gauge"
 	model.UpdateGauge(value)
-	return s.notify(model)
+	return s.notify(ctx, model)
 }
 
 func (s *MemStorage) FindAllByName(ctx context.Context, names []string) ([]*models.Metric, error) {
@@ -109,11 +109,15 @@ func (s *MemStorage) FindAllByName(ctx context.Context, names []string) ([]*mode
 	return metrics, nil
 }
 
-func (s *MemStorage) notify(model *models.Metric) error {
+func (s *MemStorage) notify(ctx context.Context, model *models.Metric) error {
 	for _, metricsObserver := range s.metricsObservers {
-		err := metricsObserver.Notify(model)
-		if err != nil {
-			return err
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			if err := metricsObserver.Notify(model); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

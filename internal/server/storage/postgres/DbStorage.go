@@ -73,7 +73,14 @@ func (db *DBStorage) UpdateCounter(ctx context.Context, name string, delta int64
 	if err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+	updatedMetric, err := db.Find(ctx, name)
+	if err != nil {
+		return err
+	}
+	return db.notify(ctx, updatedMetric)
 }
 
 func (db *DBStorage) UpdateGauge(ctx context.Context, name string, value float64) error {
@@ -81,7 +88,11 @@ func (db *DBStorage) UpdateGauge(ctx context.Context, name string, value float64
 	if err != nil {
 		return err
 	}
-	return nil
+	updatedModel, err := db.Find(ctx, name)
+	if err != nil {
+		return err
+	}
+	return db.notify(ctx, updatedModel)
 }
 
 func (db *DBStorage) FindOrCreate(ctx context.Context, name string, mType string) (*models.Metric, error) {
@@ -144,4 +155,18 @@ func (db *DBStorage) Detach(observer storage.MetricsObserver) {
 	db.observers = slices.DeleteFunc(db.observers, func(o2 storage.MetricsObserver) bool {
 		return o2 == observer
 	})
+}
+
+func (db *DBStorage) notify(ctx context.Context, model *models.Metric) error {
+	for _, observer := range db.observers {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			if err := observer.Notify(model); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"go.uber.org/zap"
@@ -22,6 +23,7 @@ type fileStorage interface {
 	ReadMetrics() ([]*models.Metrics, error)
 	SaveMetric(*models.Metrics) error
 	SaveMetrics([]*models.Metrics) error
+	io.Closer
 }
 
 type FileStorageService struct {
@@ -49,9 +51,8 @@ type FileStorageServiceConfig struct {
 
 func (s *FileStorageService) Run(ctx context.Context) {
 	if s.conf.Restore {
-		err := s.restoreRepository(ctx)
-		if err != nil {
-			panic(err)
+		if err := s.restoreRepository(ctx); err != nil {
+			logger.Log.Error("Failed to restore repository", zap.Error(err))
 		}
 	}
 

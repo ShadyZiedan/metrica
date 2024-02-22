@@ -3,12 +3,16 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/shadyziedan/metrica/internal/models"
 	"github.com/shadyziedan/metrica/internal/retry"
+	"github.com/shadyziedan/metrica/internal/server/logger"
 )
 
 type FileStorage struct {
@@ -53,9 +57,9 @@ func newProducer(fileName string, mode Mode) (*producer, error) {
 	var flag int
 	switch mode {
 	case Sync:
-		flag = os.O_WRONLY | os.O_CREATE | os.O_APPEND
+		flag = os.O_WRONLY | os.O_CREATE | os.O_APPEND | os.O_SYNC
 	case Normal:
-		flag = os.O_WRONLY | os.O_CREATE
+		flag = os.O_WRONLY | os.O_CREATE | os.O_SYNC
 	}
 	var file *os.File
 	err := retry.WithBackoff(context.Background(), 3, func(err error) bool {
@@ -74,16 +78,14 @@ func newProducer(fileName string, mode Mode) (*producer, error) {
 func (fs *FileStorage) ReadMetrics() ([]*models.Metrics, error) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
-	err := fs.OpenConsumer()
-	if err != nil {
+	if err := fs.OpenConsumer(); err != nil {
 		return nil, err
 	}
-	defer func(fs *FileStorage) {
-		err := fs.CloseConsumer()
-		if err != nil {
-			panic(err)
+	defer func() {
+		if err := fs.CloseConsumer(); err != nil {
+			logger.Log.Info("close consumer error", zap.Error(err))
 		}
-	}(fs)
+	}()
 	var res []*models.Metrics
 	for {
 		model := &models.Metrics{}
@@ -106,31 +108,28 @@ func (fs *FileStorage) SaveMetric(metric *models.Metrics) error {
 	if err != nil {
 		return err
 	}
-	defer func(producer *producer) {
-		err := producer.Close()
-		if err != nil {
-			panic(err)
+	defer func() {
+		if err := fs.CloseProducer(); err != nil {
+			logger.Log.Error("close producer failed", zap.Error(err))
 		}
-	}(fs.producer)
+	}()
 	return fs.producer.encoder.Encode(metric)
 }
 
 func (fs *FileStorage) SaveMetrics(metrics []*models.Metrics) error {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
-	err := fs.OpenProducer()
-	if err != nil {
+
+	if err := fs.OpenProducer(); err != nil {
 		return err
 	}
-	defer func(producer *producer) {
-		err := producer.Close()
-		if err != nil {
+	defer func() {
+		if err := fs.CloseProducer(); err != nil {
 			panic(err)
 		}
-	}(fs.producer)
+	}()
 	for _, metric := range metrics {
-		err := fs.producer.encoder.Encode(metric)
-		if err != nil {
+		if err := fs.producer.encoder.Encode(metric); err != nil {
 			return err
 		}
 	}
@@ -146,29 +145,41 @@ func (p *producer) Close() error {
 }
 
 func (fs *FileStorage) CloseProducer() error {
-	if fs.producer != nil {
-		err := fs.producer.Close()
-		if err != nil {
-			return err
-		}
-		fs.producer = nil
+	if fs.producer == nil {
+		return nil
+	}
+
+	defer func() { fs.producer = nil }()
+
+	if err := fs.producer.file.Sync(); err != nil {
+		return fmt.Errorf("failed to flush producer file: %w", err)
+	}
+
+	if err := fs.producer.file.Close(); err != nil {
+		return fmt.Errorf("failed to close producer file: %w", err)
 	}
 	return nil
 }
 func (fs *FileStorage) CloseConsumer() error {
-	if fs.consumer != nil {
-		err := fs.consumer.Close()
-		if err != nil {
-			return err
-		}
-		fs.producer = nil
+	if fs.consumer == nil {
+		return nil
 	}
+
+	defer func() { fs.consumer = nil }()
+
+	if err := fs.consumer.file.Sync(); err != nil {
+		return fmt.Errorf("failed to flush consumer file: %w", err)
+	}
+
+	if err := fs.consumer.file.Close(); err != nil {
+		return fmt.Errorf("failed to close consumer file: %w", err)
+	}
+
 	return nil
 }
 
 func (fs *FileStorage) Close() error {
-	err := fs.CloseProducer()
-	if err != nil {
+	if err := fs.CloseProducer(); err != nil {
 		return err
 	}
 	return fs.CloseConsumer()
