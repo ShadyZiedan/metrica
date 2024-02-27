@@ -2,15 +2,19 @@ package services
 
 import (
 	"context"
+	"io"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/shadyziedan/metrica/internal/models"
+	"github.com/shadyziedan/metrica/internal/server/logger"
 	"github.com/shadyziedan/metrica/internal/server/storage"
 )
 
 type metricsRepository interface {
-	FindOrCreate(name string) (*models.Metric, error)
-	FindAll() ([]*models.Metric, error)
+	FindOrCreate(ctx context.Context, name string, mType string) (*models.Metric, error)
+	FindAll(ctx context.Context) ([]*models.Metric, error)
 	Attach(observer storage.MetricsObserver)
 	Detach(observer storage.MetricsObserver)
 }
@@ -19,19 +23,19 @@ type fileStorage interface {
 	ReadMetrics() ([]*models.Metrics, error)
 	SaveMetric(*models.Metrics) error
 	SaveMetrics([]*models.Metrics) error
+	io.Closer
 }
 
 type FileStorageService struct {
 	conf              FileStorageServiceConfig
 	fileStorage       fileStorage
 	metricsRepository metricsRepository
-	observer          chan *models.Metric
 }
 
 func NewFileStorageService(metricsRepository metricsRepository, conf FileStorageServiceConfig) *FileStorageService {
 	var mode storage.Mode
 	if conf.StoreInterval == 0 {
-		mode = storage.Async
+		mode = storage.Sync
 	} else {
 		mode = storage.Normal
 	}
@@ -47,26 +51,16 @@ type FileStorageServiceConfig struct {
 
 func (s *FileStorageService) Run(ctx context.Context) {
 	if s.conf.Restore {
-		err := s.restoreRepository()
-		if err != nil {
-			panic(err)
+		if err := s.restoreRepository(ctx); err != nil {
+			logger.Log.Error("Failed to restore repository", zap.Error(err))
 		}
 	}
 
-	if s.conf.StoreInterval == 0 { //Async mode
-		observer := s.Observe()
-		defer s.Stop()
-		for {
-			select {
-			case metric := <-observer:
-				err := s.saveMetric(metric)
-				if err != nil {
-					panic(err)
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
+	if s.conf.StoreInterval == 0 { //Sync mode
+		s.Observe()
+		<-ctx.Done()
+		s.StopObserving()
+		return
 	}
 
 	updateStorageTicker := time.NewTicker(time.Duration(s.conf.StoreInterval) * time.Second)
@@ -75,9 +69,9 @@ func (s *FileStorageService) Run(ctx context.Context) {
 	for {
 		select {
 		case <-updateStorageTicker.C:
-			err := s.updateStorage()
+			err := s.updateStorage(ctx)
 			if err != nil {
-				panic(err)
+				logger.Log.Error("Failed to update metrics storage", zap.Error(err))
 			}
 		case <-ctx.Done():
 			return
@@ -85,12 +79,12 @@ func (s *FileStorageService) Run(ctx context.Context) {
 	}
 }
 
-func (s *FileStorageService) saveMetric(metric *models.Metric) error {
+func (s *FileStorageService) Notify(metric *models.Metric) error {
 	model := &models.Metrics{
 		ID:    metric.Name,
 		MType: metric.MType,
-		Delta: &metric.Counter,
-		Value: &metric.Gauge,
+		Delta: metric.Counter,
+		Value: metric.Gauge,
 	}
 	err := s.fileStorage.SaveMetric(model)
 	if err != nil {
@@ -99,8 +93,8 @@ func (s *FileStorageService) saveMetric(metric *models.Metric) error {
 	return nil
 }
 
-func (s *FileStorageService) updateStorage() error {
-	metrics, err := s.metricsRepository.FindAll()
+func (s *FileStorageService) updateStorage(ctx context.Context) error {
+	metrics, err := s.metricsRepository.FindAll(ctx)
 	if err != nil {
 		return err
 	}
@@ -109,38 +103,35 @@ func (s *FileStorageService) updateStorage() error {
 		model := &models.Metrics{
 			ID:    metric.Name,
 			MType: metric.MType,
-			Delta: &metric.Counter,
-			Value: &metric.Gauge,
+			Delta: metric.Counter,
+			Value: metric.Gauge,
 		}
 		jsonModels = append(jsonModels, model)
 	}
 	return s.fileStorage.SaveMetrics(jsonModels)
 }
 
-func (s *FileStorageService) restoreRepository() error {
+func (s *FileStorageService) restoreRepository(ctx context.Context) error {
 	metrics, err := s.fileStorage.ReadMetrics()
 	if err != nil {
 		return err
 	}
 	for _, metric := range metrics {
-		model, err := s.metricsRepository.FindOrCreate(metric.ID)
+		model, err := s.metricsRepository.FindOrCreate(ctx, metric.ID, metric.MType)
 		if err != nil {
 			return err
 		}
 		model.MType = metric.MType
-		model.Gauge = *metric.Value
-		model.Counter = *metric.Delta
+		model.Gauge = metric.Value
+		model.Counter = metric.Delta
 	}
 	return nil
 }
 
-func (s *FileStorageService) Observe() <-chan *models.Metric {
-	c := make(chan *models.Metric)
-	s.metricsRepository.Attach(c)
-	s.observer = c
-	return c
+func (s *FileStorageService) Observe() {
+	s.metricsRepository.Attach(s)
 }
 
-func (s *FileStorageService) Stop() {
-	close(s.observer)
+func (s *FileStorageService) StopObserving() {
+	s.metricsRepository.Detach(s)
 }

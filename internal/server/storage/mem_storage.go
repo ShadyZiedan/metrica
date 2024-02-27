@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"sync"
 
 	"github.com/go-errors/errors"
@@ -16,14 +17,16 @@ type MemStorage struct {
 	metricsObservers []MetricsObserver
 }
 
-type MetricsObserver = chan<- *models.Metric
+type MetricsObserver interface {
+	Notify(*models.Metric) error
+}
 
 func (s *MemStorage) Attach(observer MetricsObserver) {
 	s.metricsObservers = append(s.metricsObservers, observer)
 }
 
 func (s *MemStorage) Detach(observer MetricsObserver) {
-	slices.DeleteFunc(s.metricsObservers, func(o MetricsObserver) bool {
+	s.metricsObservers = slices.DeleteFunc(s.metricsObservers, func(o MetricsObserver) bool {
 		return o == observer
 	})
 }
@@ -35,65 +38,87 @@ var (
 )
 
 // FindAll implements MetricsRepository.
-func (s *MemStorage) FindAll() ([]*models.Metric, error) {
+func (s *MemStorage) FindAll(ctx context.Context) ([]*models.Metric, error) {
 	s.m.RLock()
 	defer s.m.RUnlock()
 	return maps.Values(s.storage), nil
 }
 
 // FindOrCreate implements MetricsRepository.
-func (s *MemStorage) FindOrCreate(name string) (*models.Metric, error) {
-	if metric, err := s.Find(name); err == nil {
+func (s *MemStorage) FindOrCreate(ctx context.Context, name string, mType string) (*models.Metric, error) {
+	if metric, err := s.Find(ctx, name); err == nil {
 		return metric, nil
 	}
-	if err := s.Create(name); err != nil {
+	if err := s.Create(ctx, name, mType); err != nil {
 		return nil, ErrMetricNotCreated
 	}
-	return s.Find(name)
+	return s.Find(ctx, name)
 }
 
 // Create implements MetricsRepository.
-func (s *MemStorage) Create(name string) error {
+func (s *MemStorage) Create(ctx context.Context, name string, mType string) error {
 	s.m.Lock()
 	defer s.m.Unlock()
-	if _, err := s.Find(name); err == nil {
+	if _, err := s.Find(ctx, name); err == nil {
 		return ErrMetricAlreadyExists
 	}
-	s.storage[name] = &models.Metric{Name: name}
+	s.storage[name] = &models.Metric{Name: name, MType: mType}
 	return nil
 }
 
 // Find implements MetricsRepository.
-func (s *MemStorage) Find(name string) (*models.Metric, error) {
+func (s *MemStorage) Find(ctx context.Context, name string) (*models.Metric, error) {
 	if v, ok := s.storage[name]; ok {
 		return v, nil
 	}
 	return nil, ErrMetricNotFound
 }
 
-func (s *MemStorage) UpdateCounter(name string, delta int64) error {
-	model, err := s.Find(name)
+func (s *MemStorage) UpdateCounter(ctx context.Context, name string, delta int64) error {
+	model, err := s.Find(ctx, name)
 	if err != nil {
 		return err
 	}
 	model.MType = "counter"
 	model.UpdateCounter(delta)
-	return s.notify(model)
+	return s.notify(ctx, model)
 }
 
-func (s *MemStorage) UpdateGauge(name string, value float64) error {
-	model, err := s.Find(name)
+func (s *MemStorage) UpdateGauge(ctx context.Context, name string, value float64) error {
+	model, err := s.Find(ctx, name)
 	if err != nil {
 		return err
 	}
 	model.MType = "gauge"
 	model.UpdateGauge(value)
-	return s.notify(model)
+	return s.notify(ctx, model)
 }
 
-func (s *MemStorage) notify(model *models.Metric) error {
-	for _, observer := range s.metricsObservers {
-		observer <- model
+func (s *MemStorage) FindAllByName(ctx context.Context, names []string) ([]*models.Metric, error) {
+	metrics, err := s.FindAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, metric := range metrics {
+		for _, name := range names {
+			if metric.Name == name {
+				metrics = append(metrics, metric)
+			}
+		}
+	}
+	return metrics, nil
+}
+
+func (s *MemStorage) notify(ctx context.Context, model *models.Metric) error {
+	for _, metricsObserver := range s.metricsObservers {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			if err := metricsObserver.Notify(model); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

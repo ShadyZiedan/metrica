@@ -12,7 +12,7 @@ func (h *MetricHandler) UpdateMetricHandler(w http.ResponseWriter, r *http.Reque
 	metricName := chi.URLParam(r, "metricName")
 	metricValue := chi.URLParam(r, "metricValue")
 
-	metric, err := h.repository.FindOrCreate(metricName)
+	metric, err := h.repository.FindOrCreate(r.Context(), metricName, metricType)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -25,7 +25,7 @@ func (h *MetricHandler) UpdateMetricHandler(w http.ResponseWriter, r *http.Reque
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		err = h.repository.UpdateCounter(metric.Name, num)
+		err = h.repository.UpdateCounter(r.Context(), metric.Name, num)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -37,7 +37,7 @@ func (h *MetricHandler) UpdateMetricHandler(w http.ResponseWriter, r *http.Reque
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		err = h.repository.UpdateGauge(metric.Name, num)
+		err = h.repository.UpdateGauge(r.Context(), metric.Name, num)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

@@ -14,8 +14,8 @@ var getAllMetricsTemplate = `
 {{range $metric := .}}
      <tr>
 	 	<td>{{.Name}}</td>
-		<td>{{.GetCounter}}</td>
-		<td>{{.GetGauge}}</td>
+		<td>{{.Counter}}</td>
+		<td>{{.Gauge}}</td>
 	 </tr>
 {{end}}
 </tbody>
@@ -23,7 +23,7 @@ var getAllMetricsTemplate = `
 `
 
 func (h *MetricHandler) GetAll(rw http.ResponseWriter, r *http.Request) {
-	metrics, err := h.repository.FindAll()
+	metrics, err := h.repository.FindAll(r.Context())
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return

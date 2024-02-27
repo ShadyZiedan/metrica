@@ -39,9 +39,11 @@ func (w *loggerResponseWriter) maybeWriteHeader() {
 }
 
 func (w *loggerResponseWriter) WriteHeader(statusCode int) {
-	w.responseData.wroteHeader = true
-	w.responseData.status = statusCode
-	w.ResponseWriter.WriteHeader(statusCode)
+	if !w.responseData.wroteHeader {
+		w.responseData.wroteHeader = true
+		w.responseData.status = statusCode
+		w.ResponseWriter.WriteHeader(statusCode)
+	}
 }
 
 func RequestLogger(next http.Handler) http.Handler {
