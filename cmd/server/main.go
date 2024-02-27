@@ -77,7 +77,13 @@ func main() {
 		fileStorageService.Run(ctx)
 	}()
 
-	router := handlers.NewRouter(conn, appStorage, middleware.RequestLogger, middleware.Compress)
+	router := handlers.NewRouter(
+		conn,
+		appStorage,
+		middleware.RequestLogger,
+		middleware.Compress,
+		middleware.HashChecker(cnf.Key))
+
 	srv := server.NewWebServer(
 		cnf.Address,
 		router,

@@ -12,6 +12,7 @@ type Config struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"/tmp/metrics-db.json"`
 	Restore         bool   `env:"RESTORE" envDefault:"true"`
 	DatabaseDsn     string `env:"DATABASE_DSN"`
+	Key             string `env:"KEY"`
 }
 
 func ParseConfig() Config {
@@ -27,6 +28,7 @@ func ParseConfig() Config {
 	flag.StringVar(&config.FileStoragePath, "f", config.FileStoragePath, "полное имя файла, куда сохраняются текущие значения")
 	flag.BoolVar(&config.Restore, "r", config.Restore, "загружать или нет ранее сохранённые значения из указанного файла при старте сервера")
 	flag.StringVar(&config.DatabaseDsn, "d", config.DatabaseDsn, "Строка с адресом подключения к БД")
+	flag.StringVar(&config.Key, "k", config.Key, "Ключ")
 
 	flag.Parse()
 	return config

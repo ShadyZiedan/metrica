@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -25,12 +28,13 @@ type Agent struct {
 	Client         *resty.Client
 	PollInterval   int
 	ReportInterval int
+	Key            string
 }
 
-func NewAgent(baseURL string, pollInterval, reportInterval int) *Agent {
+func NewAgent(baseURL string, pollInterval, reportInterval int, key string) *Agent {
 	client := resty.New()
 	client.BaseURL = baseURL
-	return &Agent{Client: client, PollInterval: pollInterval, ReportInterval: reportInterval}
+	return &Agent{Client: client, PollInterval: pollInterval, ReportInterval: reportInterval, Key: key}
 }
 
 func (a *Agent) Run(ctx context.Context) {
@@ -84,28 +88,42 @@ func (a *Agent) sendMetricsToServer(ctx context.Context, metrics *services.Agent
 }
 
 func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) error {
-	body, err := marshallAndCompressMetrics(metrics)
+	body, err := convertMetricsToJSON(metrics)
 	if err != nil {
-		return fmt.Errorf("error marshalling and compressing model: %s", err)
+		return fmt.Errorf("error converting metrics to json string: %s", err)
 	}
-	_, err = a.Client.R().SetContext(ctx).
+	bodyCompressed, err := compressBody(body)
+	if err != nil {
+		return err
+	}
+	req := a.Client.R().SetContext(ctx).SetBody(bodyCompressed).
 		SetHeader("Content-Encoding", "gzip").
-		SetHeader("Content-Type", "application/json").
-		SetBody(body).Post("/updates/")
+		SetHeader("Content-Type", "application/json")
+	if a.Key != "" {
+		hashHeader, err := hash(body, a.Key)
+		if err != nil {
+			return err
+		}
+		req.SetHeader("HashSHA256", hashHeader)
+	}
+	_, err = req.Post("/updates/")
 	return err
 }
 
-func marshallAndCompressMetrics(m []*models.Metrics) ([]byte, error) {
+func convertMetricsToJSON(m []*models.Metrics) ([]byte, error) {
 	jsonEncoded, err := json.Marshal(m)
 	if err != nil {
 		return nil, err
 	}
+	return jsonEncoded, nil
+}
+func compressBody(body []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	gzWriter, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
 	if err != nil {
 		return nil, err
 	}
-	_, err = gzWriter.Write(jsonEncoded)
+	_, err = gzWriter.Write(body)
 	if err != nil {
 		return nil, err
 	}
@@ -113,4 +131,13 @@ func marshallAndCompressMetrics(m []*models.Metrics) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func hash(value []byte, key string) (string, error) {
+	h := hmac.New(sha256.New, []byte(key))
+	_, err := h.Write(value)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
