@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -18,6 +15,7 @@ import (
 	"github.com/shadyziedan/metrica/internal/agent/logger"
 	"github.com/shadyziedan/metrica/internal/models"
 	"github.com/shadyziedan/metrica/internal/retry"
+	"github.com/shadyziedan/metrica/internal/security"
 
 	"github.com/go-resty/resty/v2"
 
@@ -100,7 +98,7 @@ func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) erro
 		SetHeader("Content-Encoding", "gzip").
 		SetHeader("Content-Type", "application/json")
 	if a.Key != "" {
-		hashHeader, err := hash(body, a.Key)
+		hashHeader, err := security.Hash(body, a.Key)
 		if err != nil {
 			return err
 		}
@@ -131,13 +129,4 @@ func compressBody(body []byte) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-func hash(value []byte, key string) (string, error) {
-	h := hmac.New(sha256.New, []byte(key))
-	_, err := h.Write(value)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
 }
