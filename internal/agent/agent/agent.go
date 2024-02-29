@@ -98,7 +98,7 @@ func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) erro
 		SetHeader("Content-Encoding", "gzip").
 		SetHeader("Content-Type", "application/json")
 	if a.Key != "" {
-		hashHeader, err := security.Hash(body, a.Key)
+		hashHeader, err := security.Hash(bodyCompressed, a.Key)
 		if err != nil {
 			return err
 		}

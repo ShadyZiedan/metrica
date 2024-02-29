@@ -81,8 +81,9 @@ func main() {
 		conn,
 		appStorage,
 		middleware.RequestLogger,
+		middleware.HashChecker(cnf.Key),
 		middleware.Compress,
-		middleware.HashChecker(cnf.Key))
+	)
 
 	srv := server.NewWebServer(
 		cnf.Address,

@@ -2,9 +2,6 @@ package middleware
 
 import (
 	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"io"
 	"net/http"
 
@@ -28,32 +25,24 @@ func HashChecker(key string) func(http.Handler) http.Handler {
 				nextHandler.ServeHTTP(responseWriter, r)
 				return
 			}
+
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
-				logger.Log.Error("error reading body", zap.Error(err))
+				logger.Log.Error("Error reading body", zap.Error(err))
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			copiedBody := bytes.NewBuffer(body)
-			r.Body = io.NopCloser(copiedBody)
-			defer r.Body.Close()
-
-			h := hmac.New(sha256.New, []byte(key))
-			_, err = h.Write(body)
+			r.Body = io.NopCloser(bytes.NewBuffer(body))
+			signature, err := security.Hash(body, key)
 			if err != nil {
 				logger.Log.Error("Error hashing body", zap.Error(err))
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			signature := hex.EncodeToString(h.Sum(nil))
+
 			if signature != hashString {
-				logger.Log.Info("Invalid signature", zap.String("signature", signature))
+				logger.Log.Info("Invalid signature", zap.String("key", key), zap.String("signature", signature), zap.String("received hash", hashString))
 				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			if err != nil {
-				logger.Log.Error("error closing body", zap.Error(err))
-				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			nextHandler.ServeHTTP(responseWriter, r)
