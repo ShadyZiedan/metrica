@@ -11,6 +11,7 @@ type Config struct {
 	ReportInterval int    `env:"REPORT_INTERVAL"`
 	PollInterval   int    `env:"POLL_INTERVAL"`
 	Key            string `env:"KEY"`
+	RateLimit      int    `env:"RATE_LIMIT"`
 }
 
 func ParseConfig() Config {
@@ -20,6 +21,7 @@ func ParseConfig() Config {
 	flag.IntVar(&config.ReportInterval, "r", 10, "частота отправки метрик на сервер")
 	flag.IntVar(&config.PollInterval, "p", 2, "частота опроса метрик из пакета runtime")
 	flag.StringVar(&config.Key, "k", "", "Ключ")
+	flag.IntVar(&config.RateLimit, "l", 1, "Rate limit")
 
 	flag.Parse()
 	err := env.Parse(&config)

@@ -5,11 +5,11 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"time"
 
-	"github.com/go-errors/errors"
 	"go.uber.org/zap"
 
 	"github.com/shadyziedan/metrica/internal/agent/logger"
@@ -27,12 +27,13 @@ type Agent struct {
 	PollInterval   int
 	ReportInterval int
 	Key            string
+	RateLimit      int
 }
 
-func NewAgent(baseURL string, pollInterval, reportInterval int, key string) *Agent {
+func NewAgent(baseURL string, pollInterval, reportInterval int, key string, rateLimit int) *Agent {
 	client := resty.New()
 	client.BaseURL = baseURL
-	return &Agent{Client: client, PollInterval: pollInterval, ReportInterval: reportInterval, Key: key}
+	return &Agent{Client: client, PollInterval: pollInterval, ReportInterval: reportInterval, Key: key, RateLimit: rateLimit}
 }
 
 func (a *Agent) Run(ctx context.Context) {
@@ -44,12 +45,35 @@ func (a *Agent) Run(ctx context.Context) {
 	reportChan := time.NewTicker(time.Duration(a.ReportInterval) * time.Second)
 	defer reportChan.Stop()
 
+	metricsSendCh := make(chan *services.AgentMetrics, a.RateLimit)
+	defer close(metricsSendCh)
+
+	for i := 0; i < a.RateLimit; i++ {
+		go sendMetricsWorker(ctx, a, metricsSendCh)
+	}
+
 	for {
 		select {
 		case <-pollChan.C:
 			mc.IncreasePollCount()
 		case <-reportChan.C:
 			metrics := mc.Collect()
+			metricsSendCh <- metrics
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func sendMetricsWorker(ctx context.Context, a *Agent, metricsCh <-chan *services.AgentMetrics) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case metrics, ok := <-metricsCh:
+			if !ok {
+				return
+			}
 			err := retry.WithBackoff(ctx, 3, func(err error) bool {
 				var e net.Error
 				return errors.As(err, &e)
@@ -59,8 +83,6 @@ func (a *Agent) Run(ctx context.Context) {
 			if err != nil {
 				logger.Log.Error("Error sending metric", zap.Error(err))
 			}
-		case <-ctx.Done():
-			return
 		}
 	}
 }

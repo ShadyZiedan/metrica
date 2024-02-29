@@ -1,8 +1,12 @@
 package services
 
 import (
+	"fmt"
 	"math/rand"
 	"runtime"
+
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 type MerticsCollector struct {
@@ -14,10 +18,10 @@ func NewMetricsCollector() *MerticsCollector {
 }
 
 func (mc *MerticsCollector) Collect() *AgentMetrics {
+	metrics := newAgentMetrics()
+
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
-
-	metrics := newAgentMetrics()
 
 	metrics.Gauge.UpdateMetric("Alloc", float64(stats.Alloc))
 	metrics.Gauge.UpdateMetric("BuckHashSys", float64(stats.BuckHashSys))
@@ -50,6 +54,21 @@ func (mc *MerticsCollector) Collect() *AgentMetrics {
 	metrics.Gauge.UpdateMetric("RandomValue", rand.Float64())
 
 	metrics.Counter.UpdateMetric("PollCount", mc.pollCount)
+
+	// collecting virtual memory info
+	memory, err := mem.VirtualMemory()
+	if err == nil {
+		metrics.Gauge.UpdateMetric("TotalMemory", float64(memory.Total))
+		metrics.Gauge.UpdateMetric("FreeMemory", float64(memory.Free))
+	}
+
+	// collecting cpu utilization info
+	cpuUsages, err := cpu.Percent(0, true)
+	if err == nil {
+		for i, cpuUsage := range cpuUsages {
+			metrics.Gauge.UpdateMetric(fmt.Sprintf("CPUutilization%d", i), cpuUsage)
+		}
+	}
 
 	return metrics
 }
