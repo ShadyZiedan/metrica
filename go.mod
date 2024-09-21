@@ -1,6 +1,8 @@
 module github.com/shadyziedan/metrica
 
-go 1.22
+go 1.22.0
+
+toolchain go1.23.1
 
 require (
 	github.com/go-chi/chi/v5 v5.1.0
@@ -10,6 +12,7 @@ require (
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
+	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
 )
 
 require (

@@ -2,11 +2,11 @@ package storage
 
 import (
 	"context"
-	"maps"
 	"slices"
 	"sync"
 
 	"github.com/go-errors/errors"
+	"golang.org/x/exp/maps"
 
 	"github.com/shadyziedan/metrica/internal/models"
 )
@@ -41,7 +41,7 @@ var (
 func (s *MemStorage) FindAll(ctx context.Context) ([]*models.Metric, error) {
 	s.m.RLock()
 	defer s.m.RUnlock()
-	return slices.Collect(maps.Values(s.storage)), nil
+	return maps.Values(s.storage), nil
 }
 
 // FindOrCreate implements MetricsRepository.
