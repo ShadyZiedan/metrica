@@ -3,10 +3,10 @@ package postgres
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"golang.org/x/exp/slices"
 
 	"github.com/shadyziedan/metrica/internal/models"
 	"github.com/shadyziedan/metrica/internal/server/storage"

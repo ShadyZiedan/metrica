@@ -2,11 +2,11 @@ package storage
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	"github.com/go-errors/errors"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	"github.com/shadyziedan/metrica/internal/models"
 )

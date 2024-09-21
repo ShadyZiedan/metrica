@@ -5,16 +5,18 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
-	"github.com/go-errors/errors"
 	"go.uber.org/zap"
 
 	"github.com/shadyziedan/metrica/internal/agent/logger"
 	"github.com/shadyziedan/metrica/internal/models"
 	"github.com/shadyziedan/metrica/internal/retry"
+	"github.com/shadyziedan/metrica/internal/security"
 
 	"github.com/go-resty/resty/v2"
 
@@ -25,12 +27,14 @@ type Agent struct {
 	Client         *resty.Client
 	PollInterval   int
 	ReportInterval int
+	Key            string
+	RateLimit      int
 }
 
-func NewAgent(baseURL string, pollInterval, reportInterval int) *Agent {
+func NewAgent(baseURL string, pollInterval, reportInterval int, key string, rateLimit int) *Agent {
 	client := resty.New()
 	client.BaseURL = baseURL
-	return &Agent{Client: client, PollInterval: pollInterval, ReportInterval: reportInterval}
+	return &Agent{Client: client, PollInterval: pollInterval, ReportInterval: reportInterval, Key: key, RateLimit: rateLimit}
 }
 
 func (a *Agent) Run(ctx context.Context) {
@@ -42,12 +46,42 @@ func (a *Agent) Run(ctx context.Context) {
 	reportChan := time.NewTicker(time.Duration(a.ReportInterval) * time.Second)
 	defer reportChan.Stop()
 
+	metricsSendCh := make(chan *services.AgentMetrics, a.RateLimit)
+	defer close(metricsSendCh)
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < a.RateLimit; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sendMetricsWorker(ctx, a, metricsSendCh)
+		}()
+	}
+
 	for {
 		select {
 		case <-pollChan.C:
 			mc.IncreasePollCount()
 		case <-reportChan.C:
 			metrics := mc.Collect()
+			metricsSendCh <- metrics
+		case <-ctx.Done():
+			wg.Wait()
+			return
+		}
+	}
+}
+
+func sendMetricsWorker(ctx context.Context, a *Agent, metricsCh <-chan *services.AgentMetrics) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case metrics, ok := <-metricsCh:
+			if !ok {
+				return
+			}
 			err := retry.WithBackoff(ctx, 3, func(err error) bool {
 				var e net.Error
 				return errors.As(err, &e)
@@ -57,8 +91,6 @@ func (a *Agent) Run(ctx context.Context) {
 			if err != nil {
 				logger.Log.Error("Error sending metric", zap.Error(err))
 			}
-		case <-ctx.Done():
-			return
 		}
 	}
 }
@@ -84,28 +116,42 @@ func (a *Agent) sendMetricsToServer(ctx context.Context, metrics *services.Agent
 }
 
 func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) error {
-	body, err := marshallAndCompressMetrics(metrics)
+	body, err := convertMetricsToJSON(metrics)
 	if err != nil {
-		return fmt.Errorf("error marshalling and compressing model: %s", err)
+		return fmt.Errorf("couldn't convert metrics to json string: %s", err)
 	}
-	_, err = a.Client.R().SetContext(ctx).
+	bodyCompressed, err := compressBody(body)
+	if err != nil {
+		return err
+	}
+	req := a.Client.R().SetContext(ctx).SetBody(bodyCompressed).
 		SetHeader("Content-Encoding", "gzip").
-		SetHeader("Content-Type", "application/json").
-		SetBody(body).Post("/updates/")
+		SetHeader("Content-Type", "application/json")
+	if a.Key != "" {
+		hashHeader, err := security.Hash(bodyCompressed, a.Key)
+		if err != nil {
+			return err
+		}
+		req.SetHeader("HashSHA256", hashHeader)
+	}
+	_, err = req.Post("/updates/")
 	return err
 }
 
-func marshallAndCompressMetrics(m []*models.Metrics) ([]byte, error) {
+func convertMetricsToJSON(m []*models.Metrics) ([]byte, error) {
 	jsonEncoded, err := json.Marshal(m)
 	if err != nil {
 		return nil, err
 	}
+	return jsonEncoded, nil
+}
+func compressBody(body []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	gzWriter, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
 	if err != nil {
 		return nil, err
 	}
-	_, err = gzWriter.Write(jsonEncoded)
+	_, err = gzWriter.Write(body)
 	if err != nil {
 		return nil, err
 	}

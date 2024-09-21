@@ -16,7 +16,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	newAgent := agent.NewAgent("http://"+conf.Address, conf.PollInterval, conf.ReportInterval)
+	newAgent := agent.NewAgent("http://"+conf.Address, conf.PollInterval, conf.ReportInterval, conf.Key, conf.RateLimit)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	newAgent.Run(ctx)
