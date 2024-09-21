@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -48,8 +49,14 @@ func (a *Agent) Run(ctx context.Context) {
 	metricsSendCh := make(chan *services.AgentMetrics, a.RateLimit)
 	defer close(metricsSendCh)
 
+	var wg sync.WaitGroup
+
 	for i := 0; i < a.RateLimit; i++ {
-		go sendMetricsWorker(ctx, a, metricsSendCh)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sendMetricsWorker(ctx, a, metricsSendCh)
+		}()
 	}
 
 	for {
@@ -60,6 +67,7 @@ func (a *Agent) Run(ctx context.Context) {
 			metrics := mc.Collect()
 			metricsSendCh <- metrics
 		case <-ctx.Done():
+			wg.Wait()
 			return
 		}
 	}
@@ -110,7 +118,7 @@ func (a *Agent) sendMetricsToServer(ctx context.Context, metrics *services.Agent
 func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) error {
 	body, err := convertMetricsToJSON(metrics)
 	if err != nil {
-		return fmt.Errorf("error converting metrics to json string: %s", err)
+		return fmt.Errorf("couldn't convert metrics to json string: %s", err)
 	}
 	bodyCompressed, err := compressBody(body)
 	if err != nil {
