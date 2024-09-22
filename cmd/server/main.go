@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"sync"
@@ -84,6 +86,8 @@ func main() {
 		middleware.HashChecker(cnf.Key),
 		middleware.Compress,
 	)
+
+	router.Handle(`/debug/pprof/*`, http.DefaultServeMux)
 
 	srv := server.NewWebServer(
 		cnf.Address,
