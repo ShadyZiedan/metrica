@@ -22,6 +22,7 @@ var getAllMetricsTemplate = `
 </table>
 `
 
+// GetAll returns all metrics in html.
 func (h *MetricHandler) GetAll(rw http.ResponseWriter, r *http.Request) {
 	metrics, err := h.repository.FindAll(r.Context())
 	if err != nil {

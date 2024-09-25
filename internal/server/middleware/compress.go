@@ -60,6 +60,7 @@ func (cr *compressReader) Close() error {
 	return nil
 }
 
+// Compress reads compressed request data and returns compressed response data
 func Compress(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		wo := w

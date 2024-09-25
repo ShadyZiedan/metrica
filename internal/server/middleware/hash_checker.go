@@ -11,6 +11,8 @@ import (
 	"github.com/shadyziedan/metrica/internal/server/logger"
 )
 
+// HashChecker checks HashSHA256 header
+// throws an error if the header doesn't match the request body hash
 func HashChecker(key string) func(http.Handler) http.Handler {
 	if key == "" {
 		return func(next http.Handler) http.Handler {

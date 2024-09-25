@@ -23,6 +23,8 @@ import (
 	"github.com/shadyziedan/metrica/internal/agent/services"
 )
 
+// Agent represents a metric collection and reporting agent.
+// It collects metrics from various sources, compresses and sends them to a server.
 type Agent struct {
 	Client         *resty.Client
 	PollInterval   int
@@ -31,12 +33,14 @@ type Agent struct {
 	RateLimit      int
 }
 
+// NewAgent creates a new instance of the Agent struct.
 func NewAgent(baseURL string, pollInterval, reportInterval int, key string, rateLimit int) *Agent {
 	client := resty.New()
 	client.BaseURL = baseURL
 	return &Agent{Client: client, PollInterval: pollInterval, ReportInterval: reportInterval, Key: key, RateLimit: rateLimit}
 }
 
+// Run starts the metric collection and reporting process for the agent.
 func (a *Agent) Run(ctx context.Context) {
 
 	mc := services.NewMetricsCollector()
