@@ -46,6 +46,7 @@ func (w *loggerResponseWriter) WriteHeader(statusCode int) {
 	}
 }
 
+// RequestLogger logs request parameters and response status code, duration, and response size
 func RequestLogger(next http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 

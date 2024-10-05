@@ -8,6 +8,8 @@ import (
 	"github.com/shadyziedan/metrica/internal/models"
 )
 
+// UpdateBatch handles a batch update of metrics.
+
 func (h *MetricHandler) UpdateBatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var data []models.Metrics

@@ -8,6 +8,13 @@ import (
 	"github.com/shadyziedan/metrica/internal/models"
 )
 
+// UpdateJSON handles HTTP requests to update a metric in the system.
+// It expects a JSON payload containing the metric ID, type, delta (for counter type), and value (for gauge type).
+// The function first decodes the request body into a Metrics struct.
+// It then finds or creates a metric in the repository based on the provided ID and type.
+// Depending on the metric type, it updates the corresponding metric value in the repository.
+// Finally, it retrieves the updated metric from the repository, sets the response header to "application/json",
+// and encodes the metric data into the response body.
 func (h *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	data := &models.Metrics{}

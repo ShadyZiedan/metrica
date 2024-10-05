@@ -1,3 +1,4 @@
+// Package storage provides a storage implementation that uses a file to store and retrieve metrics.
 package storage
 
 import (
@@ -15,6 +16,7 @@ import (
 	"github.com/shadyziedan/metrica/internal/server/logger"
 )
 
+// FileStorage is a storage implementation that uses a file to store and retrieve metrics.
 type FileStorage struct {
 	producer *producer
 	consumer *consumer
@@ -24,6 +26,7 @@ type FileStorage struct {
 	mutex sync.RWMutex
 }
 
+// NewFileStorage creates a new instance of FileStorage.
 func NewFileStorage(fileName string, mode Mode) *FileStorage {
 	return &FileStorage{fileName: fileName, mode: mode}
 }

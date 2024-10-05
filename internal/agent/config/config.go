@@ -1,3 +1,4 @@
+// Package config provides a way to parse and access configuration settings for the agent.
 package config
 
 import (
@@ -6,6 +7,7 @@ import (
 	"github.com/caarlos0/env/v10"
 )
 
+// Config represents the configuration settings for the agent.
 type Config struct {
 	Address        string `env:"ADDRESS"`
 	ReportInterval int    `env:"REPORT_INTERVAL"`
@@ -14,6 +16,7 @@ type Config struct {
 	RateLimit      int    `env:"RATE_LIMIT"`
 }
 
+// ParseConfig parses the command-line flags and environment variables to create a new Config instance.
 func ParseConfig() Config {
 	var config Config
 

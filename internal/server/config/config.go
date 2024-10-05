@@ -1,3 +1,4 @@
+// Package config provides a way to parse and access configuration settings for the web server.
 package config
 
 import (
@@ -6,13 +7,20 @@ import (
 	"github.com/caarlos0/env/v10"
 )
 
+// Config represents configuration model for the app environment.
 type Config struct {
-	Address         string `env:"ADDRESS"`
-	StoreInterval   int    `env:"STORE_INTERVAL"`
+	// Address is web server host and port
+	Address string `env:"ADDRESS"`
+	// StoreInterval is interval in seconds to save current server metrics to disk
+	StoreInterval int `env:"STORE_INTERVAL"`
+	// FileStoragePath is full path to file where server metrics will be saved to/loaded from
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
-	Restore         bool   `env:"RESTORE"`
-	DatabaseDsn     string `env:"DATABASE_DSN"`
-	Key             string `env:"KEY"`
+	// Restore is a flag to indicate whether to load previously saved metrics from file on server start or not
+	Restore bool `env:"RESTORE"`
+	// DatabaseDsn is a string to connect to the database
+	DatabaseDsn string `env:"DATABASE_DSN"`
+	// Key is a secret key used by the hash checker middleware
+	Key string `env:"KEY"`
 }
 
 func ParseConfig() Config {
