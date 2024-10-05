@@ -7,21 +7,32 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/shadyziedan/metrica/internal/security"
 	"github.com/shadyziedan/metrica/internal/server/logger"
 )
 
-// HashChecker checks HashSHA256 header
-// throws an error if the header doesn't match the request body hash
-func HashChecker(key string) func(http.Handler) http.Handler {
-	if key == "" {
+type hasher interface {
+	Hash(body []byte) (string, error)
+}
+
+// HashChecker is a middleware function that checks the HashSHA256 header of incoming HTTP requests.
+// If the header doesn't match the SHA256 hash of the request body, it returns a 400 Bad Request status.
+// If the hasher is nil, it returns the next handler without any modifications.
+//
+// The function takes a hasher interface as a parameter, which must implement the Hash method.
+// The Hash method takes a byte slice and returns a string representing the SHA256 hash of the input.
+//
+// The function returns a new http.Handler that wraps the provided nextHandler.
+// It reads the request body, calculates the SHA256 hash, compares it with the HashSHA256 header,
+// and sets the HashSHA256 header in the response if the hasher is not nil.
+func HashChecker(hasher hasher) func(http.Handler) http.Handler {
+	if hasher == nil {
 		return func(next http.Handler) http.Handler {
 			return next
 		}
 	}
 	return func(nextHandler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			responseWriter := newHashResponseWriter(w, key)
+			responseWriter := newHashResponseWriter(w, hasher)
 			hashString := r.Header.Get("HashSHA256")
 			if hashString == "" {
 				nextHandler.ServeHTTP(responseWriter, r)
@@ -35,7 +46,7 @@ func HashChecker(key string) func(http.Handler) http.Handler {
 				return
 			}
 			r.Body = io.NopCloser(bytes.NewBuffer(body))
-			signature, err := security.Hash(body, key)
+			signature, err := hasher.Hash(body)
 			if err != nil {
 				logger.Log.Error("Error hashing body", zap.Error(err))
 				w.WriteHeader(http.StatusInternalServerError)
@@ -43,7 +54,7 @@ func HashChecker(key string) func(http.Handler) http.Handler {
 			}
 
 			if signature != hashString {
-				logger.Log.Info("Invalid signature", zap.String("key", key), zap.String("signature", signature), zap.String("received hash", hashString))
+				logger.Log.Info("Invalid signature", zap.String("signature", signature), zap.String("received hash", hashString))
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -54,14 +65,14 @@ func HashChecker(key string) func(http.Handler) http.Handler {
 
 type hashResponseWriter struct {
 	http.ResponseWriter
-	secretKey string
+	hasher hasher
 }
 
-func newHashResponseWriter(w http.ResponseWriter, secretKey string) *hashResponseWriter {
-	return &hashResponseWriter{ResponseWriter: w, secretKey: secretKey}
+func newHashResponseWriter(w http.ResponseWriter, hasher hasher) *hashResponseWriter {
+	return &hashResponseWriter{ResponseWriter: w, hasher: hasher}
 }
 func (w *hashResponseWriter) Write(buf []byte) (int, error) {
-	hashString, err := security.Hash(buf, w.secretKey)
+	hashString, err := w.hasher.Hash(buf)
 	if err != nil {
 		return 0, err
 	}

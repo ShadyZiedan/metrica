@@ -7,6 +7,14 @@ import (
 	"encoding/hex"
 )
 
+type DefaultHasher struct {
+	secret string
+}
+
+func NewDefaultHasher(secret string) *DefaultHasher {
+	return &DefaultHasher{secret: secret}
+}
+
 // Hash generates a SHA256 HMAC hash of the given value using the provided key.
 // The resulting hash is then encoded as a hexadecimal string.
 //
@@ -17,8 +25,8 @@ import (
 // Returns:
 // - A string representing the hashed value encoded as a hexadecimal string.
 // - An error if there was an issue with the hashing process.
-func Hash(value []byte, key string) (string, error) {
-	h := hmac.New(sha256.New, []byte(key))
+func (hs *DefaultHasher) Hash(value []byte) (string, error) {
+	h := hmac.New(sha256.New, []byte(hs.secret))
 	_, err := h.Write(value)
 	if err != nil {
 		return "", err

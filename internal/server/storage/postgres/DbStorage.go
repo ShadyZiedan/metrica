@@ -1,3 +1,4 @@
+// Package postgres provides a storage implementation using a PostgreSQL database to store and retrieve metrics.
 package postgres
 
 import (
@@ -11,11 +12,13 @@ import (
 	"github.com/shadyziedan/metrica/internal/server/storage"
 )
 
+// DBStorage is a storage implementation that uses a PostgreSQL database to store and retrieve metrics.
 type DBStorage struct {
 	conn      pgConn
 	observers []storage.MetricsObserver
 }
 
+// pgConn is an interface that wraps the pgx.Conn type for easier testing.
 type pgConn interface {
 	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)
@@ -23,6 +26,7 @@ type pgConn interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
+// NewDBStorage creates a new instance of DBStorage.
 func NewDBStorage(conn pgConn) (*DBStorage, error) {
 	postgresConn := &pgConnWrapper{conn: conn}
 	_, err := postgresConn.Exec(context.Background(), `
@@ -42,19 +46,16 @@ create unique index if not exists metrics_name_uindex on metrics (name);
 	return &DBStorage{conn: postgresConn}, nil
 }
 
+// Constants for SQL queries.
 const findMetric = `SELECT name, m_type, gauge, counter FROM metrics WHERE name = $1;`
-
 const createMetric = `INSERT INTO metrics (name, m_type) values ($1, $2)`
-
 const updateCounter = `
         INSERT INTO metrics (name, m_type, counter)
         VALUES ($1, 'counter', $2)
         ON CONFLICT (name) DO UPDATE
         SET counter = coalesce(metrics.counter, 0) + $2
     `
-
 const updateGauge = `UPDATE metrics SET gauge = $1 WHERE name = $2;`
-
 const findOrCreateMetric = `
 WITH inserted AS (
     INSERT INTO metrics (name, m_type) values ($1, $2)
@@ -64,10 +65,10 @@ WITH inserted AS (
 SELECT * FROM inserted
 UNION
 SELECT name, m_type, gauge, counter FROM metrics WHERE name = $1;`
-
 const findAllMetrics = `SELECT name, m_type, gauge, counter FROM metrics`
 const findMetricsByName = `SELECT name, m_type, gauge, counter FROM metrics where name IN ($1)`
 
+// Find retrieves a metric from the database by its name.
 func (db *DBStorage) Find(ctx context.Context, name string) (*models.Metric, error) {
 	row := db.conn.QueryRow(ctx, findMetric, name)
 	var metric models.Metric
@@ -78,11 +79,13 @@ func (db *DBStorage) Find(ctx context.Context, name string) (*models.Metric, err
 	return &metric, err
 }
 
+// Create inserts a new metric into the database.
 func (db *DBStorage) Create(ctx context.Context, name string, mType string) error {
 	_, err := db.conn.Exec(ctx, createMetric, name, mType)
 	return err
 }
 
+// UpdateCounter updates the counter of a metric in the database by a specified delta.
 func (db *DBStorage) UpdateCounter(ctx context.Context, name string, delta int64) error {
 	tx, err := db.conn.Begin(ctx)
 	if err != nil {
@@ -103,6 +106,7 @@ func (db *DBStorage) UpdateCounter(ctx context.Context, name string, delta int64
 	return db.notify(ctx, updatedMetric)
 }
 
+// UpdateGauge updates the gauge value of a metric in the database.
 func (db *DBStorage) UpdateGauge(ctx context.Context, name string, value float64) error {
 	_, err := db.conn.Exec(ctx, updateGauge, value, name)
 	if err != nil {
@@ -115,6 +119,7 @@ func (db *DBStorage) UpdateGauge(ctx context.Context, name string, value float64
 	return db.notify(ctx, updatedModel)
 }
 
+// FindOrCreate retrieves a metric from the database by its name, or creates a new one if it doesn't exist.
 func (db *DBStorage) FindOrCreate(ctx context.Context, name string, mType string) (*models.Metric, error) {
 	row := db.conn.QueryRow(ctx, findOrCreateMetric, name, mType)
 	var metric models.Metric
@@ -125,6 +130,7 @@ func (db *DBStorage) FindOrCreate(ctx context.Context, name string, mType string
 	return &metric, err
 }
 
+// FindAll retrieves all metrics from the database.
 func (db *DBStorage) FindAll(ctx context.Context) ([]*models.Metric, error) {
 	rows, err := db.conn.Query(ctx, findAllMetrics)
 	if err != nil {
@@ -145,6 +151,7 @@ func (db *DBStorage) FindAll(ctx context.Context) ([]*models.Metric, error) {
 	return metrics, err
 }
 
+// FindAllByName retrieves metrics from the database by their names.
 func (db *DBStorage) FindAllByName(ctx context.Context, names []string) ([]*models.Metric, error) {
 	rows, err := db.conn.Query(ctx, findMetricsByName, names)
 	if err != nil {
@@ -163,16 +170,19 @@ func (db *DBStorage) FindAllByName(ctx context.Context, names []string) ([]*mode
 	return metrics, err
 }
 
+// Attach adds an observer to the DBStorage instance.
 func (db *DBStorage) Attach(observer storage.MetricsObserver) {
 	db.observers = append(db.observers, observer)
 }
 
+// Detach removes an observer from the DBStorage instance.
 func (db *DBStorage) Detach(observer storage.MetricsObserver) {
 	db.observers = slices.DeleteFunc(db.observers, func(o2 storage.MetricsObserver) bool {
 		return o2 == observer
 	})
 }
 
+// notify notifies all attached observers about a metric update.
 func (db *DBStorage) notify(ctx context.Context, model *models.Metric) error {
 	for _, observer := range db.observers {
 		select {

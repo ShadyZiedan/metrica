@@ -1,3 +1,4 @@
+// Package models contains the data structures and methods for working with metric data.
 package models
 
 // Metric represents a metric record in the database

@@ -1,3 +1,5 @@
+// Package handlers contains the HTTP request handlers for the server.
+// Each handler function is responsible for processing a specific type of HTTP request and generating a response.
 package handlers
 
 import (

@@ -1,3 +1,4 @@
+// Package services contains the business logic for the agent metrics.
 package services
 
 // AgentMetrics represents the metrics collected by the agent.
