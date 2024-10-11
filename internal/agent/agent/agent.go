@@ -1,3 +1,5 @@
+// Package agent provides the functionality for a metric collection and reporting agent.
+// It collects metrics from various sources, compresses and sends them to a server.
 package agent
 
 import (
@@ -23,20 +25,32 @@ import (
 	"github.com/shadyziedan/metrica/internal/agent/services"
 )
 
+// Agent represents a metric collection and reporting agent.
+// It collects metrics from various sources, compresses and sends them to a server.
 type Agent struct {
 	Client         *resty.Client
 	PollInterval   int
 	ReportInterval int
-	Key            string
 	RateLimit      int
+	hasher         hasher
 }
 
+type hasher interface {
+	Hash(data []byte) (string, error)
+}
+
+// NewAgent creates a new instance of the Agent struct.
 func NewAgent(baseURL string, pollInterval, reportInterval int, key string, rateLimit int) *Agent {
 	client := resty.New()
 	client.BaseURL = baseURL
-	return &Agent{Client: client, PollInterval: pollInterval, ReportInterval: reportInterval, Key: key, RateLimit: rateLimit}
+	var hasher hasher
+	if key != "" {
+		hasher = security.NewDefaultHasher(key)
+	}
+	return &Agent{Client: client, PollInterval: pollInterval, ReportInterval: reportInterval, RateLimit: rateLimit, hasher: hasher}
 }
 
+// Run starts the metric collection and reporting process for the agent.
 func (a *Agent) Run(ctx context.Context) {
 
 	mc := services.NewMetricsCollector()
@@ -127,8 +141,8 @@ func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) erro
 	req := a.Client.R().SetContext(ctx).SetBody(bodyCompressed).
 		SetHeader("Content-Encoding", "gzip").
 		SetHeader("Content-Type", "application/json")
-	if a.Key != "" {
-		hashHeader, err := security.Hash(bodyCompressed, a.Key)
+	if a.hasher != nil {
+		hashHeader, err := a.hasher.Hash(bodyCompressed)
 		if err != nil {
 			return err
 		}

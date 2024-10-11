@@ -1,10 +1,15 @@
 package models
 
+// Metrics represents a metric model request and response
 type Metrics struct {
-	ID    string   `json:"id"`              // имя метрики
-	MType string   `json:"type"`            // параметр, принимающий значение Gauge или Counter
-	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи Counter
-	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи Gauge
+	// ID is the metric identifier or name of the metric
+	ID string `json:"id"`
+	// MType is the metric type (Gauge or Counter)
+	MType string `json:"type"`
+	// Delta is the value for Counter metrics (optional)
+	Delta *int64 `json:"delta,omitempty"`
+	// Value is the value for Gauge metrics (optional)
+	Value *float64 `json:"value,omitempty"`
 }
 
 func (m *Metrics) ParseMetricModel(model *Metric) {

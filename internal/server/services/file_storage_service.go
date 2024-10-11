@@ -1,3 +1,4 @@
+// Package services contains the business logic and data access services for the server.
 package services
 
 import (
@@ -26,12 +27,15 @@ type fileStorage interface {
 	io.Closer
 }
 
+// FileStorageService represents a service for storing and retrieving metrics data from a file storage system.
 type FileStorageService struct {
 	conf              FileStorageServiceConfig
 	fileStorage       fileStorage
 	metricsRepository metricsRepository
 }
 
+// NewFileStorageService creates a new instance of the FileStorageService.
+// It accepts a metricsRepository and a FileStorageServiceConfig as parameters, and returns a pointer to the new FileStorageService instance.
 func NewFileStorageService(metricsRepository metricsRepository, conf FileStorageServiceConfig) *FileStorageService {
 	var mode storage.Mode
 	if conf.StoreInterval == 0 {
@@ -43,12 +47,15 @@ func NewFileStorageService(metricsRepository metricsRepository, conf FileStorage
 	return &FileStorageService{conf: conf, fileStorage: fs, metricsRepository: metricsRepository}
 }
 
+// FileStorageServiceConfig represents the configuration settings for the FileStorageService.
 type FileStorageServiceConfig struct {
 	FileStoragePath string
 	StoreInterval   int
 	Restore         bool
 }
 
+// Run starts the FileStorageService and performs the necessary operations based on the configuration settings.
+// It accepts a context as a parameter, which can be used to cancel the service gracefully.
 func (s *FileStorageService) Run(ctx context.Context) {
 	if s.conf.Restore {
 		if err := s.restoreRepository(ctx); err != nil {
@@ -79,6 +86,8 @@ func (s *FileStorageService) Run(ctx context.Context) {
 	}
 }
 
+// Notify is called by the metricsRepository when a metric is updated.
+// It saves the updated metric to the file storage system.
 func (s *FileStorageService) Notify(metric *models.Metric) error {
 	model := &models.Metrics{
 		ID:    metric.Name,
@@ -128,10 +137,12 @@ func (s *FileStorageService) restoreRepository(ctx context.Context) error {
 	return nil
 }
 
+// Observe attaches the FileStorageService as an observer to the metricsRepository, so it can receive notifications when metrics are updated.
 func (s *FileStorageService) Observe() {
 	s.metricsRepository.Attach(s)
 }
 
+// StopObserving detaches the FileStorageService as an observer from the metricsRepository, so it stops receiving notifications when metrics are updated.
 func (s *FileStorageService) StopObserving() {
 	s.metricsRepository.Detach(s)
 }

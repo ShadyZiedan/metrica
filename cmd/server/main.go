@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"sync"
@@ -11,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/shadyziedan/metrica/internal/models"
+	"github.com/shadyziedan/metrica/internal/security"
 	"github.com/shadyziedan/metrica/internal/server/config"
 	"github.com/shadyziedan/metrica/internal/server/handlers"
 	"github.com/shadyziedan/metrica/internal/server/logger"
@@ -31,6 +34,10 @@ type metricsRepository interface {
 	UpdateGauge(ctx context.Context, name string, value float64) error
 	Attach(observer storage.MetricsObserver)
 	Detach(observer storage.MetricsObserver)
+}
+
+type hasher interface {
+	Hash([]byte) (string, error)
 }
 
 func main() {
@@ -77,13 +84,19 @@ func main() {
 		fileStorageService.Run(ctx)
 	}()
 
+	var hasher hasher
+	if cnf.Key != "" {
+		hasher = security.NewDefaultHasher(cnf.Key)
+	}
 	router := handlers.NewRouter(
 		conn,
 		appStorage,
 		middleware.RequestLogger,
-		middleware.HashChecker(cnf.Key),
+		middleware.HashChecker(hasher),
 		middleware.Compress,
 	)
+
+	router.Handle(`/debug/pprof/*`, http.DefaultServeMux)
 
 	srv := server.NewWebServer(
 		cnf.Address,

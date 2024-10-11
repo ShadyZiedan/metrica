@@ -1,3 +1,5 @@
+// Package handlers contains the HTTP request handlers for the server.
+// Each handler function is responsible for processing a specific type of HTTP request and generating a response.
 package handlers
 
 import (
@@ -22,6 +24,7 @@ var getAllMetricsTemplate = `
 </table>
 `
 
+// GetAll returns all metrics in html.
 func (h *MetricHandler) GetAll(rw http.ResponseWriter, r *http.Request) {
 	metrics, err := h.repository.FindAll(r.Context())
 	if err != nil {
