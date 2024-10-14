@@ -29,7 +29,7 @@ type CounterCollection struct {
 	collection map[string]int
 }
 
-func newAgentMetrics() *AgentMetrics {
+func NewAgentMetrics() *AgentMetrics {
 	return &AgentMetrics{
 		Gauge:   &GaugeCollection{collection: make(map[string]float64)},
 		Counter: &CounterCollection{collection: make(map[string]int)},

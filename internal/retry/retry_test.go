@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // ExampleWithBackoff demonstrates how to use the WithBackoff function.
@@ -37,4 +40,21 @@ func ExampleWithBackoff() {
 
 	// Output:
 	// Success after 3 attempts
+}
+
+func TestRetryBackoff(t *testing.T) {
+	ctx := context.Background()
+	var retryCount int
+	err := WithBackoff(ctx, 3, func(err error) bool {
+		return err != nil
+	}, func() error {
+		retryCount++
+		if retryCount < 3 {
+			return errors.New("network error")
+		}
+		return nil
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 3, retryCount)
 }

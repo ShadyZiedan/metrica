@@ -30,14 +30,12 @@ func (h *MetricHandler) UpdateJSON(w http.ResponseWriter, r *http.Request) {
 
 	switch data.MType {
 	case "counter":
-		err := h.repository.UpdateCounter(ctx, metric.Name, *data.Delta)
-		if err != nil {
+		if err = h.repository.UpdateCounter(ctx, metric.Name, *data.Delta); err != nil {
 			http.Error(w, fmt.Sprintf("error updating counter metric: %s", err), http.StatusInternalServerError)
 			return
 		}
 	case "gauge":
-		err := h.repository.UpdateGauge(ctx, metric.Name, *data.Value)
-		if err != nil {
+		if err = h.repository.UpdateGauge(ctx, metric.Name, *data.Value); err != nil {
 			http.Error(w, fmt.Sprintf("error updating counter metric: %s", err), http.StatusInternalServerError)
 			return
 		}
