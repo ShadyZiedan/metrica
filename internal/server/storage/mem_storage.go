@@ -99,14 +99,15 @@ func (s *MemStorage) FindAllByName(ctx context.Context, names []string) ([]*mode
 	if err != nil {
 		return nil, err
 	}
+	res := make([]*models.Metric, 0, len(metrics))
 	for _, metric := range metrics {
 		for _, name := range names {
 			if metric.Name == name {
-				metrics = append(metrics, metric)
+				res = append(res, metric)
 			}
 		}
 	}
-	return metrics, nil
+	return res, nil
 }
 
 func (s *MemStorage) notify(ctx context.Context, model *models.Metric) error {

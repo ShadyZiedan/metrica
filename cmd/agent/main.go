@@ -9,6 +9,7 @@ import (
 	"github.com/shadyziedan/metrica/internal/agent/agent"
 	"github.com/shadyziedan/metrica/internal/agent/config"
 	"github.com/shadyziedan/metrica/internal/agent/logger"
+	"github.com/shadyziedan/metrica/internal/agent/services"
 )
 
 var (
@@ -24,7 +25,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	newAgent := agent.NewAgent("http://"+conf.Address, conf.PollInterval, conf.ReportInterval, conf.Key, conf.RateLimit)
+	newAgent := agent.NewAgent(
+		"http://"+conf.Address,
+		conf.PollInterval,
+		conf.ReportInterval,
+		conf.Key,
+		conf.RateLimit,
+		services.NewMetricsCollector(),
+	)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	newAgent.Run(ctx)

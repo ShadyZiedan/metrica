@@ -21,7 +21,7 @@ func NewMetricsCollector() *MerticsCollector {
 
 // Collect collects metrics from various sources and returns them.
 func (mc *MerticsCollector) Collect() *AgentMetrics {
-	metrics := newAgentMetrics()
+	metrics := NewAgentMetrics()
 
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
