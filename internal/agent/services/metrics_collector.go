@@ -9,7 +9,7 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
-// MetricsCollector collects metrics from various sources and provides a way to access them.
+// MerticsCollector collects metrics from various sources and provides a way to access them.
 type MerticsCollector struct {
 	pollCount int
 }

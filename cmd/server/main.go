@@ -84,15 +84,15 @@ func main() {
 		fileStorageService.Run(ctx)
 	}()
 
-	var hasher hasher
+	var hasherimpl hasher
 	if cnf.Key != "" {
-		hasher = security.NewDefaultHasher(cnf.Key)
+		hasherimpl = security.NewDefaultHasher(cnf.Key)
 	}
 	router := handlers.NewRouter(
 		conn,
 		appStorage,
 		middleware.RequestLogger,
-		middleware.HashChecker(hasher),
+		middleware.HashChecker(hasherimpl),
 		middleware.Compress,
 	)
 

@@ -96,7 +96,7 @@ func (db *DBStorage) UpdateCounter(ctx context.Context, name string, delta int64
 	if err != nil {
 		return err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
 	updatedMetric, err := db.Find(ctx, name)
@@ -142,8 +142,7 @@ func (db *DBStorage) FindAll(ctx context.Context) ([]*models.Metric, error) {
 
 	for rows.Next() {
 		metric := &models.Metric{}
-		err := rows.Scan(&metric.Name, &metric.MType, &metric.Gauge, &metric.Counter)
-		if err != nil {
+		if err = rows.Scan(&metric.Name, &metric.MType, &metric.Gauge, &metric.Counter); err != nil {
 			return nil, err
 		}
 		metrics = append(metrics, metric)
@@ -161,8 +160,7 @@ func (db *DBStorage) FindAllByName(ctx context.Context, names []string) ([]*mode
 	metrics := make([]*models.Metric, 0, len(names))
 	for rows.Next() {
 		metric := &models.Metric{}
-		err := rows.Scan(&metric.Name, &metric.MType, &metric.Gauge, &metric.Counter)
-		if err != nil {
+		if err = rows.Scan(&metric.Name, &metric.MType, &metric.Gauge, &metric.Counter); err != nil {
 			return nil, err
 		}
 		metrics = append(metrics, metric)

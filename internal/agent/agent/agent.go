@@ -43,11 +43,11 @@ type hasher interface {
 func NewAgent(baseURL string, pollInterval, reportInterval int, key string, rateLimit int) *Agent {
 	client := resty.New()
 	client.BaseURL = baseURL
-	var hasher hasher
+	var hasherImpl hasher
 	if key != "" {
-		hasher = security.NewDefaultHasher(key)
+		hasherImpl = security.NewDefaultHasher(key)
 	}
-	return &Agent{Client: client, PollInterval: pollInterval, ReportInterval: reportInterval, RateLimit: rateLimit, hasher: hasher}
+	return &Agent{Client: client, PollInterval: pollInterval, ReportInterval: reportInterval, RateLimit: rateLimit, hasher: hasherImpl}
 }
 
 // Run starts the metric collection and reporting process for the agent.
@@ -142,9 +142,9 @@ func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) erro
 		SetHeader("Content-Encoding", "gzip").
 		SetHeader("Content-Type", "application/json")
 	if a.hasher != nil {
-		hashHeader, err := a.hasher.Hash(bodyCompressed)
-		if err != nil {
-			return err
+		hashHeader, hashErr := a.hasher.Hash(bodyCompressed)
+		if hashErr != nil {
+			return hashErr
 		}
 		req.SetHeader("HashSHA256", hashHeader)
 	}
