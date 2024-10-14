@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -40,7 +41,14 @@ type hasher interface {
 	Hash([]byte) (string, error)
 }
 
+var (
+	BuildVersion string
+	BuildDate    string
+	BuildCommit  string
+)
+
 func main() {
+	showBuildInfo()
 	cnf := config.ParseConfig()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -111,4 +119,22 @@ func main() {
 		}
 	}()
 	wg.Wait()
+}
+
+func showBuildInfo() {
+	if BuildVersion != "" {
+		fmt.Println("Build version: ", BuildVersion)
+	} else {
+		fmt.Println("Build version: N/A")
+	}
+	if BuildDate != "" {
+		fmt.Println("Build date: ", BuildDate)
+	} else {
+		fmt.Println("Build date: N/A")
+	}
+	if BuildCommit != "" {
+		fmt.Println("Build commit: ", BuildCommit)
+	} else {
+		fmt.Println("Build commit: N/A")
+	}
 }
