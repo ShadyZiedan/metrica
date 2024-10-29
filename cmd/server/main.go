@@ -55,7 +55,7 @@ func main() {
 	}
 
 	cnf := config.ParseConfig()
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
 	conn, err := pgxpool.New(ctx, cnf.DatabaseDsn)
