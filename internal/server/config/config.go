@@ -21,6 +21,8 @@ type Config struct {
 	DatabaseDsn string `env:"DATABASE_DSN"`
 	// Key is a secret key used by the hash checker middleware
 	Key string `env:"KEY"`
+	// CryptoKey is a path to the private key to decrypt message received from the agent
+	CryptoKey string `env:"CRYPTO_KEY"`
 }
 
 func ParseConfig() Config {
@@ -32,6 +34,7 @@ func ParseConfig() Config {
 	flag.BoolVar(&config.Restore, "r", true, "загружать или нет ранее сохранённые значения из указанного файла при старте сервера")
 	flag.StringVar(&config.DatabaseDsn, "d", "", "Строка с адресом подключения к БД")
 	flag.StringVar(&config.Key, "k", "", "Ключ")
+	flag.StringVar(&config.CryptoKey, "crypto-key", "", "путь до файла с приватным ключом")
 
 	flag.Parse()
 

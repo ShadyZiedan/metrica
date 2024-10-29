@@ -88,12 +88,23 @@ func main() {
 	if cnf.Key != "" {
 		hasher = security.NewDefaultHasher(cnf.Key)
 	}
-	router := handlers.NewRouter(
-		conn,
-		appStorage,
+	middlewares := []func(http.Handler) http.Handler{
 		middleware.RequestLogger,
 		middleware.HashChecker(hasher),
 		middleware.Compress,
+	}
+	if cnf.CryptoKey != "" {
+		encryptionMiddleWare, err := middleware.NewEncryptionFromFile(cnf.CryptoKey)
+		if err != nil {
+			logger.Log.Error("failed to create encryption middleware", zap.Error(err))
+		}
+		middlewares = append(middlewares, encryptionMiddleWare.MiddleWare)
+	}
+
+	router := handlers.NewRouter(
+		conn,
+		appStorage,
+		middlewares...,
 	)
 
 	router.Handle(`/debug/pprof/*`, http.DefaultServeMux)
@@ -105,8 +116,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		err = srv.ListenAndServe(ctx)
-		if err != nil {
+		if err = srv.ListenAndServe(ctx); err != nil {
 			panic(err)
 		}
 	}()

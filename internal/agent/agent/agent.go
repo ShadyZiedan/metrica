@@ -6,21 +6,21 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/shadyziedan/metrica/internal/agent/config"
 	"net"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/shadyziedan/metrica/internal/agent/logger"
 	"github.com/shadyziedan/metrica/internal/models"
 	"github.com/shadyziedan/metrica/internal/retry"
-	"github.com/shadyziedan/metrica/internal/security"
-
-	"github.com/go-resty/resty/v2"
 
 	"github.com/shadyziedan/metrica/internal/agent/services"
 )
@@ -33,21 +33,46 @@ type Agent struct {
 	ReportInterval int
 	RateLimit      int
 	hasher         hasher
+	encryptor      encryptor
 }
 
 type hasher interface {
 	Hash(data []byte) (string, error)
 }
 
+type encryptor interface {
+	Encrypt(data []byte) ([]byte, error)
+	GetEncryptedKey() (string, error)
+}
+
+type Option = func(agent *Agent)
+
 // NewAgent creates a new instance of the Agent struct.
-func NewAgent(baseURL string, pollInterval, reportInterval int, key string, rateLimit int) *Agent {
+func NewAgent(cnf config.Config, options ...Option) *Agent {
 	client := resty.New()
-	client.BaseURL = baseURL
-	var hasher hasher
-	if key != "" {
-		hasher = security.NewDefaultHasher(key)
+	client.BaseURL = "http://" + cnf.Address
+	a := &Agent{
+		Client:         client,
+		PollInterval:   cnf.PollInterval,
+		ReportInterval: cnf.ReportInterval,
+		RateLimit:      cnf.RateLimit,
 	}
-	return &Agent{Client: client, PollInterval: pollInterval, ReportInterval: reportInterval, RateLimit: rateLimit, hasher: hasher}
+	for _, option := range options {
+		option(a)
+	}
+	return a
+}
+
+func WithHasher(hasher hasher) Option {
+	return func(a *Agent) {
+		a.hasher = hasher
+	}
+}
+
+func WithEncryptor(encryptor encryptor) Option {
+	return func(a *Agent) {
+		a.encryptor = encryptor
+	}
 }
 
 // Run starts the metric collection and reporting process for the agent.
@@ -134,13 +159,33 @@ func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) erro
 	if err != nil {
 		return fmt.Errorf("couldn't convert metrics to json string: %s", err)
 	}
+
+	req := a.Client.R().SetContext(ctx).
+		SetHeader("Content-Encoding", "gzip").
+		SetHeader("Content-Type", "application/json")
+
+	// Encrypt the json body
+	if a.encryptor != nil {
+		encryptedKey, encryptionError := a.encryptor.GetEncryptedKey()
+		if encryptionError != nil {
+			return fmt.Errorf("error encrypting metrics data: %s", encryptionError)
+		}
+		req.SetHeader(`X-Encrypted-Key`, encryptedKey)
+
+		bodyEncrypted, encryptionError := a.encryptor.Encrypt(body)
+		if encryptionError != nil {
+			return fmt.Errorf("error encrypting metrics data: %s", encryptionError)
+		}
+
+		body = []byte(base64.StdEncoding.EncodeToString(bodyEncrypted))
+	}
+
+	// Compress the data
 	bodyCompressed, err := compressBody(body)
 	if err != nil {
 		return err
 	}
-	req := a.Client.R().SetContext(ctx).SetBody(bodyCompressed).
-		SetHeader("Content-Encoding", "gzip").
-		SetHeader("Content-Type", "application/json")
+
 	if a.hasher != nil {
 		hashHeader, err := a.hasher.Hash(bodyCompressed)
 		if err != nil {
@@ -148,7 +193,8 @@ func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) erro
 		}
 		req.SetHeader("HashSHA256", hashHeader)
 	}
-	_, err = req.Post("/updates/")
+
+	_, err = req.SetBody(bodyCompressed).Post("/updates/")
 	return err
 }
 
