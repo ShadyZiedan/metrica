@@ -49,14 +49,14 @@ var (
 
 func main() {
 	showBuildInfo()
-	cnf := config.ParseConfig()
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	err := logger.Initialize("info")
 	if err != nil {
 		panic(err)
 	}
+
+	cnf := config.ParseConfig()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	conn, err := pgxpool.New(ctx, cnf.DatabaseDsn)
 	if err != nil {
@@ -78,7 +78,7 @@ func main() {
 
 	fileStorageServiceConfig := services.FileStorageServiceConfig{
 		FileStoragePath: cnf.FileStoragePath,
-		StoreInterval:   cnf.StoreInterval,
+		StoreInterval:   cnf.StoreInterval.Duration,
 		Restore:         cnf.Restore,
 	}
 
@@ -102,8 +102,8 @@ func main() {
 		middleware.Compress,
 	}
 	if cnf.CryptoKey != "" {
-		encryptionMiddleWare, err := middleware.NewEncryptionFromFile(cnf.CryptoKey)
-		if err != nil {
+		encryptionMiddleWare, encryptionErr := middleware.NewEncryptionFromFile(cnf.CryptoKey)
+		if encryptionErr != nil {
 			logger.Log.Error("failed to create encryption middleware", zap.Error(err))
 		}
 		middlewares = append(middlewares, encryptionMiddleWare.MiddleWare)

@@ -37,8 +37,8 @@ func TestNewAgent(t *testing.T) {
 	mc := new(MockMetricsCollector)
 	cnf := config.Config{
 		Address:        "http://example.com",
-		PollInterval:   5,
-		ReportInterval: 10,
+		PollInterval:   config.Duration{Duration: time.Second * 5},
+		ReportInterval: config.Duration{Duration: time.Second * 10},
 		RateLimit:      2,
 	}
 
@@ -46,8 +46,8 @@ func TestNewAgent(t *testing.T) {
 
 	assert.NotNil(t, a)
 	assert.Equal(t, "http://example.com", a.Client.BaseURL)
-	assert.Equal(t, 5, a.PollInterval)
-	assert.Equal(t, 10, a.ReportInterval)
+	assert.Equal(t, 5*time.Second, a.PollInterval)
+	assert.Equal(t, 10*time.Second, a.ReportInterval)
 	assert.Equal(t, 2, a.RateLimit)
 }
 
@@ -69,8 +69,8 @@ func TestSendMetricsToServer(t *testing.T) {
 	mc := new(MockMetricsCollector)
 	cnf := config.Config{
 		Address:        server.URL,
-		ReportInterval: 5,
-		PollInterval:   10,
+		ReportInterval: config.Duration{Duration: time.Second * 5},
+		PollInterval:   config.Duration{Duration: time.Second * 10},
 		RateLimit:      2,
 	}
 	a := NewAgent(cnf, mc)
@@ -89,8 +89,8 @@ func TestRun(t *testing.T) {
 	mc := new(MockMetricsCollector)
 	cnf := config.Config{
 		Address:        "http://example.com",
-		ReportInterval: 2,
-		PollInterval:   1,
+		ReportInterval: config.Duration{Duration: time.Second * 2},
+		PollInterval:   config.Duration{Duration: time.Second * 1},
 		RateLimit:      2,
 	}
 	a := NewAgent(cnf, mc)
@@ -124,8 +124,8 @@ func TestSendMetricsFailure(t *testing.T) {
 	mc := new(MockMetricsCollector)
 	cnf := config.Config{
 		Address:        server.URL,
-		ReportInterval: 5,
-		PollInterval:   10,
+		ReportInterval: config.Duration{Duration: time.Second * 5},
+		PollInterval:   config.Duration{Duration: time.Second * 10},
 		RateLimit:      2,
 	}
 	a := NewAgent(cnf, mc)

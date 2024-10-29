@@ -22,11 +22,13 @@ var (
 
 func main() {
 	showBuildInfo()
-	cnf := config.ParseConfig()
 	err := logger.Initialize("info")
 	if err != nil {
 		panic(err)
 	}
+
+	cnf := config.ParseConfig()
+
 	var options []agent.Option
 	if cnf.CryptoKey != "" {
 		encryptor, err := security.NewDefaultEncryptorFromFile(cnf.CryptoKey)

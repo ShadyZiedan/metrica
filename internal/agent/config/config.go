@@ -2,7 +2,12 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
+	"github.com/shadyziedan/metrica/internal/agent/logger"
+	"go.uber.org/zap"
+	"os"
+	"time"
 
 	"github.com/caarlos0/env/v10"
 )
@@ -10,35 +15,60 @@ import (
 // Config represents the configuration settings for the agent.
 type Config struct {
 	// Address is web server host address
-	Address string `env:"ADDRESS"`
+	Address string `env:"ADDRESS" json:"address"`
 	// ReportInterval is interval in seconds of reporting metrics
-	ReportInterval int `env:"REPORT_INTERVAL"`
+	ReportInterval Duration `env:"REPORT_INTERVAL" json:"report_interval"`
 	// PollInterval is interval or frequency in seconds of gathering metrics from runtime package
-	PollInterval int `env:"POLL_INTERVAL"`
+	PollInterval Duration `env:"POLL_INTERVAL" json:"poll_interval"`
 	// Key is a secret key for hashing data
-	Key string `env:"KEY"`
+	Key string `env:"KEY" json:"-"`
 	// RateLimit is a rate limiter of metrics being sent
-	RateLimit int `env:"RATE_LIMIT"`
+	RateLimit int `env:"RATE_LIMIT" json:"-"`
 	// CryptoKey is a path to public key to encrypt data sent to the server
-	CryptoKey string `env:"CRYPTO_KEY"`
+	CryptoKey string `env:"CRYPTO_KEY" json:"crypto_key"`
+}
+
+type Duration struct {
+	time.Duration
 }
 
 // ParseConfig parses the command-line flags and environment variables to create a new Config instance.
 func ParseConfig() Config {
-	var config Config
+	var cnf Config
 
-	flag.StringVar(&config.Address, "a", "localhost:8080", "адрес эндпоинта HTTP-сервера")
-	flag.IntVar(&config.ReportInterval, "r", 10, "частота отправки метрик на сервер")
-	flag.IntVar(&config.PollInterval, "p", 2, "частота опроса метрик из пакета runtime")
-	flag.StringVar(&config.Key, "k", "", "Ключ")
-	flag.IntVar(&config.RateLimit, "l", 1, "Rate limit")
-	flag.StringVar(&config.CryptoKey, "crypto-key", "", "путь до файла с публичным ключом")
+	var configJSONPath string
+
+	flag.StringVar(&configJSONPath, "c", "", "Path to JSON config file")
+	flag.StringVar(&cnf.Address, "a", "localhost:8080", "адрес эндпоинта HTTP-сервера")
+	flag.DurationVar(&cnf.ReportInterval.Duration, "r", 10*time.Second, "частота отправки метрик на сервер")
+	flag.DurationVar(&cnf.PollInterval.Duration, "p", 2*time.Second, "частота опроса метрик из пакета runtime")
+	flag.StringVar(&cnf.Key, "k", "", "Ключ")
+	flag.IntVar(&cnf.RateLimit, "l", 1, "Rate limit")
+	flag.StringVar(&cnf.CryptoKey, "crypto-key", "", "путь до файла с публичным ключом")
 
 	flag.Parse()
-	err := env.Parse(&config)
+
+	if configJSONPath != "" {
+		err := parseFromJSONFile(configJSONPath, &cnf)
+		if err != nil {
+			logger.Log.Fatal("failed to parse config from file", zap.Error(err))
+		}
+	}
+	flag.Parse()
+
+	err := env.Parse(&cnf)
+	if err != nil {
+		logger.Log.Fatal("failed to parse config from env", zap.Error(err))
+	}
+
+	return cnf
+}
+
+func parseFromJSONFile(configJSONPath string, config *Config) error {
+	f, err := os.Open(configJSONPath)
 	if err != nil {
 		panic(err)
 	}
-
-	return config
+	defer f.Close()
+	return json.NewDecoder(f).Decode(config)
 }

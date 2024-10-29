@@ -29,8 +29,8 @@ import (
 // It collects metrics from various sources, compresses and sends them to a server.
 type Agent struct {
 	Client           *resty.Client
-	PollInterval     int
-	ReportInterval   int
+	PollInterval     time.Duration
+	ReportInterval   time.Duration
 	RateLimit        int
 	hasher           hasher
 	encryptor        encryptor
@@ -59,8 +59,8 @@ func NewAgent(cnf config.Config, mc metricsCollector, options ...Option) *Agent 
 	client.BaseURL = cnf.Address
 	a := &Agent{
 		Client:           client,
-		PollInterval:     cnf.PollInterval,
-		ReportInterval:   cnf.ReportInterval,
+		PollInterval:     cnf.PollInterval.Duration,
+		ReportInterval:   cnf.ReportInterval.Duration,
 		RateLimit:        cnf.RateLimit,
 		metricsCollector: mc,
 	}
@@ -84,9 +84,9 @@ func WithEncryptor(encryptor encryptor) Option {
 
 // Run starts the metric collection and reporting process for the agent.
 func (a *Agent) Run(ctx context.Context) {
-	pollChan := time.NewTicker(time.Duration(a.PollInterval) * time.Second)
+	pollChan := time.NewTicker(a.PollInterval)
 	defer pollChan.Stop()
-	reportChan := time.NewTicker(time.Duration(a.ReportInterval) * time.Second)
+	reportChan := time.NewTicker(a.ReportInterval)
 	defer reportChan.Stop()
 
 	metricsSendCh := make(chan *services.AgentMetrics, a.RateLimit)
