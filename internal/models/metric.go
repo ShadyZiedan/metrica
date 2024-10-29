@@ -28,3 +28,11 @@ func (m *Metric) UpdateGauge(num float64) {
 	}
 	*m.Gauge = num
 }
+
+func NewCounterMetric(name string, value int64) *Metric {
+	return &Metric{Name: name, MType: "counter", Counter: &value}
+}
+
+func NewGaugeMetric(name string, value float64) *Metric {
+	return &Metric{Name: name, MType: "gauge", Gauge: &value}
+}

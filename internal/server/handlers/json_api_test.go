@@ -160,6 +160,20 @@ func TestJSONApi(t *testing.T) {
 				err:        true,
 			},
 		},
+		{
+			title:       "update batch metric value",
+			request:     "/updates/",
+			method:      "POST",
+			requestBody: `[{ "id": "Alloc123", "type": "gauge", "value": 55.05 }, { "id": "PollCount123", "type": "counter", "delta": 100 } ]`,
+			want: struct {
+				statusCode   int
+				responseBody string
+				err          bool
+			}{
+				statusCode:   http.StatusOK,
+				responseBody: `[{ "id": "Alloc123", "type": "gauge", "value": 55.05 }, { "id": "PollCount123", "type": "counter", "delta": 100 } ]`,
+			},
+		},
 	}
 
 	memStorage := storage.NewMemStorage()

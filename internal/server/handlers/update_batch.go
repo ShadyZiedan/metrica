@@ -31,8 +31,8 @@ func (h *MetricHandler) UpdateBatch(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, fmt.Sprintf("error updating null counter value metric: %s", err), http.StatusBadRequest)
 				return
 			}
-			err := h.repository.UpdateCounter(ctx, metric.Name, *item.Delta)
-			if err != nil {
+
+			if err = h.repository.UpdateCounter(ctx, metric.Name, *item.Delta); err != nil {
 				http.Error(w, fmt.Sprintf("error updating counter metric: %s", err), http.StatusInternalServerError)
 				return
 			}
@@ -41,8 +41,8 @@ func (h *MetricHandler) UpdateBatch(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, fmt.Sprintf("error updating null gauge value metric: %s", err), http.StatusBadRequest)
 				return
 			}
-			err := h.repository.UpdateGauge(ctx, metric.Name, *item.Value)
-			if err != nil {
+
+			if err = h.repository.UpdateGauge(ctx, metric.Name, *item.Value); err != nil {
 				http.Error(w, fmt.Sprintf("error updating counter metric: %s", err), http.StatusInternalServerError)
 				return
 			}

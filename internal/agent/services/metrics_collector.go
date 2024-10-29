@@ -9,7 +9,7 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
-// MetricsCollector collects metrics from various sources and provides a way to access them.
+// MerticsCollector collects metrics from various sources and provides a way to access them.
 type MerticsCollector struct {
 	pollCount int
 }
@@ -21,7 +21,7 @@ func NewMetricsCollector() *MerticsCollector {
 
 // Collect collects metrics from various sources and returns them.
 func (mc *MerticsCollector) Collect() *AgentMetrics {
-	metrics := newAgentMetrics()
+	metrics := NewAgentMetrics()
 
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)

@@ -28,12 +28,13 @@ import (
 // Agent represents a metric collection and reporting agent.
 // It collects metrics from various sources, compresses and sends them to a server.
 type Agent struct {
-	Client         *resty.Client
-	PollInterval   int
-	ReportInterval int
-	RateLimit      int
-	hasher         hasher
-	encryptor      encryptor
+	Client           *resty.Client
+	PollInterval     int
+	ReportInterval   int
+	RateLimit        int
+	hasher           hasher
+	encryptor        encryptor
+	metricsCollector metricsCollector
 }
 
 type hasher interface {
@@ -47,15 +48,21 @@ type encryptor interface {
 
 type Option = func(agent *Agent)
 
+type metricsCollector interface {
+	Collect() *services.AgentMetrics
+	IncreasePollCount()
+}
+
 // NewAgent creates a new instance of the Agent struct.
-func NewAgent(cnf config.Config, options ...Option) *Agent {
+func NewAgent(cnf config.Config, mc metricsCollector, options ...Option) *Agent {
 	client := resty.New()
-	client.BaseURL = "http://" + cnf.Address
+	client.BaseURL = cnf.Address
 	a := &Agent{
-		Client:         client,
-		PollInterval:   cnf.PollInterval,
-		ReportInterval: cnf.ReportInterval,
-		RateLimit:      cnf.RateLimit,
+		Client:           client,
+		PollInterval:     cnf.PollInterval,
+		ReportInterval:   cnf.ReportInterval,
+		RateLimit:        cnf.RateLimit,
+		metricsCollector: mc,
 	}
 	for _, option := range options {
 		option(a)
@@ -77,9 +84,6 @@ func WithEncryptor(encryptor encryptor) Option {
 
 // Run starts the metric collection and reporting process for the agent.
 func (a *Agent) Run(ctx context.Context) {
-
-	mc := services.NewMetricsCollector()
-
 	pollChan := time.NewTicker(time.Duration(a.PollInterval) * time.Second)
 	defer pollChan.Stop()
 	reportChan := time.NewTicker(time.Duration(a.ReportInterval) * time.Second)
@@ -94,16 +98,16 @@ func (a *Agent) Run(ctx context.Context) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			sendMetricsWorker(ctx, a, metricsSendCh)
+			a.sendMetricsWorker(ctx, metricsSendCh)
 		}()
 	}
 
 	for {
 		select {
 		case <-pollChan.C:
-			mc.IncreasePollCount()
+			a.metricsCollector.IncreasePollCount()
 		case <-reportChan.C:
-			metrics := mc.Collect()
+			metrics := a.metricsCollector.Collect()
 			metricsSendCh <- metrics
 		case <-ctx.Done():
 			wg.Wait()
@@ -112,7 +116,7 @@ func (a *Agent) Run(ctx context.Context) {
 	}
 }
 
-func sendMetricsWorker(ctx context.Context, a *Agent, metricsCh <-chan *services.AgentMetrics) {
+func (a *Agent) sendMetricsWorker(ctx context.Context, metricsCh <-chan *services.AgentMetrics) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -187,15 +191,21 @@ func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) erro
 	}
 
 	if a.hasher != nil {
-		hashHeader, err := a.hasher.Hash(bodyCompressed)
-		if err != nil {
-			return err
+		hashHeader, hashErr := a.hasher.Hash(bodyCompressed)
+		if hashErr != nil {
+			return hashErr
 		}
 		req.SetHeader("HashSHA256", hashHeader)
 	}
 
-	_, err = req.SetBody(bodyCompressed).Post("/updates/")
-	return err
+	res, err := req.SetBody(bodyCompressed).Post("/updates/")
+	if err != nil {
+		return fmt.Errorf("couldn't send metrics: %w", err)
+	}
+	if res.IsError() {
+		return fmt.Errorf("request failed with status %d: %s", res.StatusCode(), res.String())
+	}
+	return nil
 }
 
 func convertMetricsToJSON(m []*models.Metrics) ([]byte, error) {
