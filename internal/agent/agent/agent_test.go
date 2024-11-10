@@ -3,12 +3,13 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"github.com/shadyziedan/metrica/internal/agent/config"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/shadyziedan/metrica/internal/agent/config"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -137,4 +138,28 @@ func TestSendMetricsFailure(t *testing.T) {
 	err := a.sendMetricsToServer(context.Background(), metrics)
 	assert.Error(t, err)
 	assert.Equal(t, "request failed with status 500: Internal Server Error", err.Error())
+}
+
+func TestMetricsRealIP(t *testing.T) {
+	// Set up a mock server to respond to the request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.NotEmpty(t, r.Header.Get("X-Real-IP"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	mc := new(MockMetricsCollector)
+	cnf := config.Config{
+		Address:        server.URL,
+		ReportInterval: config.Duration{Duration: time.Second * 5},
+		PollInterval:   config.Duration{Duration: time.Second * 10},
+		RateLimit:      2,
+	}
+	a := NewAgent(cnf, mc)
+
+	metrics := services.NewAgentMetrics()
+	metrics.Gauge.UpdateMetric("test_gauge", 123.45)
+	metrics.Counter.UpdateMetric("test_counter", 1)
+	err := a.sendMetricsToServer(context.Background(), metrics)
+	assert.NoError(t, err)
 }

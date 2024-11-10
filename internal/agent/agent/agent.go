@@ -35,6 +35,7 @@ type Agent struct {
 	hasher           hasher
 	encryptor        encryptor
 	metricsCollector metricsCollector
+	localIPAddress   string
 }
 
 type hasher interface {
@@ -55,6 +56,10 @@ type metricsCollector interface {
 
 // NewAgent creates a new instance of the Agent struct.
 func NewAgent(cnf config.Config, mc metricsCollector, options ...Option) *Agent {
+	localIP, err := getLocalIPAddress()
+	if err != nil {
+		logger.Log.Fatal("Failed to get local IP address", zap.Error(err))
+	}
 	client := resty.New()
 	client.BaseURL = cnf.Address
 	a := &Agent{
@@ -63,6 +68,7 @@ func NewAgent(cnf config.Config, mc metricsCollector, options ...Option) *Agent 
 		ReportInterval:   cnf.ReportInterval.Duration,
 		RateLimit:        cnf.RateLimit,
 		metricsCollector: mc,
+		localIPAddress:   localIP,
 	}
 	for _, option := range options {
 		option(a)
@@ -166,7 +172,8 @@ func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) erro
 
 	req := a.Client.R().SetContext(ctx).
 		SetHeader("Content-Encoding", "gzip").
-		SetHeader("Content-Type", "application/json")
+		SetHeader("Content-Type", "application/json").
+		SetHeader("X-REAL-IP", a.localIPAddress)
 
 	// Encrypt the json body
 	if a.encryptor != nil {
@@ -206,6 +213,33 @@ func (a *Agent) sendMetrics(ctx context.Context, metrics []*models.Metrics) erro
 		return fmt.Errorf("request failed with status %d: %s", res.StatusCode(), res.String())
 	}
 	return nil
+}
+
+func getLocalIPAddress() (string, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	for _, iface := range interfaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return "", err
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			// Проверяем, что это не loopback-адрес и что это IPv4
+			if ip != nil && !ip.IsLoopback() && ip.To4() != nil {
+				return ip.String(), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("local IP address not found")
 }
 
 func convertMetricsToJSON(m []*models.Metrics) ([]byte, error) {

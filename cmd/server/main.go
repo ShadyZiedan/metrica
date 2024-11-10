@@ -109,6 +109,14 @@ func main() {
 		middlewares = append(middlewares, encryptionMiddleWare.MiddleWare)
 	}
 
+	if cnf.TrustedSubnet != "" {
+		mw, err := middleware.NewTrustedSubNetMiddleware(cnf.TrustedSubnet)
+		if err != nil {
+			logger.Log.Fatal("failed to create trusted subnet middleware", zap.Error(err))
+		}
+		middlewares = append(middlewares, mw)
+	}
+
 	router := handlers.NewRouter(
 		conn,
 		appStorage,
