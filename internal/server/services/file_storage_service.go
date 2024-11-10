@@ -50,7 +50,7 @@ func NewFileStorageService(metricsRepository metricsRepository, conf FileStorage
 // FileStorageServiceConfig represents the configuration settings for the FileStorageService.
 type FileStorageServiceConfig struct {
 	FileStoragePath string
-	StoreInterval   int
+	StoreInterval   time.Duration
 	Restore         bool
 }
 
@@ -63,14 +63,14 @@ func (s *FileStorageService) Run(ctx context.Context) {
 		}
 	}
 
-	if s.conf.StoreInterval == 0 { //Sync mode
+	if s.conf.StoreInterval.Seconds() == 0 { //Sync mode
 		s.Observe()
 		<-ctx.Done()
 		s.StopObserving()
 		return
 	}
 
-	updateStorageTicker := time.NewTicker(time.Duration(s.conf.StoreInterval) * time.Second)
+	updateStorageTicker := time.NewTicker(s.conf.StoreInterval * time.Second)
 	defer updateStorageTicker.Stop()
 
 	for {

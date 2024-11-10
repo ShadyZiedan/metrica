@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/shadyziedan/metrica/internal/security"
+	"go.uber.org/zap"
 	"os"
 	"os/signal"
 
@@ -20,19 +22,28 @@ var (
 
 func main() {
 	showBuildInfo()
-	conf := config.ParseConfig()
 	err := logger.Initialize("info")
 	if err != nil {
 		panic(err)
 	}
-	newAgent := agent.NewAgent(
-		"http://"+conf.Address,
-		conf.PollInterval,
-		conf.ReportInterval,
-		conf.Key,
-		conf.RateLimit,
-		services.NewMetricsCollector(),
-	)
+
+	cnf := config.ParseConfig()
+
+	var options []agent.Option
+	if cnf.CryptoKey != "" {
+		encryptor, err := security.NewDefaultEncryptorFromFile(cnf.CryptoKey)
+		if err != nil {
+			logger.Log.Error("encryption key is not loaded", zap.Error(err))
+		} else {
+			options = append(options, agent.WithEncryptor(encryptor))
+		}
+	}
+
+	if cnf.Key != "" {
+		hasher := security.NewDefaultHasher(cnf.Key)
+		options = append(options, agent.WithHasher(hasher))
+	}
+	newAgent := agent.NewAgent(cnf, services.NewMetricsCollector(), options...)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	newAgent.Run(ctx)

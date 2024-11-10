@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"github.com/shadyziedan/metrica/internal/agent/config"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -34,12 +35,19 @@ func (m *MockMetricsCollector) IncreasePollCount() {
 // TestNewAgent tests the NewAgent function
 func TestNewAgent(t *testing.T) {
 	mc := new(MockMetricsCollector)
-	a := NewAgent("http://example.com", 5, 10, "secret", 2, mc)
+	cnf := config.Config{
+		Address:        "http://example.com",
+		PollInterval:   config.Duration{Duration: time.Second * 5},
+		ReportInterval: config.Duration{Duration: time.Second * 10},
+		RateLimit:      2,
+	}
+
+	a := NewAgent(cnf, mc)
 
 	assert.NotNil(t, a)
 	assert.Equal(t, "http://example.com", a.Client.BaseURL)
-	assert.Equal(t, 5, a.PollInterval)
-	assert.Equal(t, 10, a.ReportInterval)
+	assert.Equal(t, 5*time.Second, a.PollInterval)
+	assert.Equal(t, 10*time.Second, a.ReportInterval)
 	assert.Equal(t, 2, a.RateLimit)
 }
 
@@ -59,7 +67,13 @@ func TestSendMetricsToServer(t *testing.T) {
 	defer server.Close()
 
 	mc := new(MockMetricsCollector)
-	a := NewAgent(server.URL, 5, 10, "secret", 2, mc)
+	cnf := config.Config{
+		Address:        server.URL,
+		ReportInterval: config.Duration{Duration: time.Second * 5},
+		PollInterval:   config.Duration{Duration: time.Second * 10},
+		RateLimit:      2,
+	}
+	a := NewAgent(cnf, mc)
 
 	metrics := services.NewAgentMetrics()
 
@@ -73,7 +87,13 @@ func TestSendMetricsToServer(t *testing.T) {
 // TestRun tests the Run method of the Agent
 func TestRun(t *testing.T) {
 	mc := new(MockMetricsCollector)
-	a := NewAgent("http://example.com", 1, 2, "secret", 1, mc)
+	cnf := config.Config{
+		Address:        "http://example.com",
+		ReportInterval: config.Duration{Duration: time.Second * 2},
+		PollInterval:   config.Duration{Duration: time.Second * 1},
+		RateLimit:      2,
+	}
+	a := NewAgent(cnf, mc)
 
 	// Set up a mock for metrics collection
 	mc.On("IncreasePollCount").Return()
@@ -102,7 +122,13 @@ func TestSendMetricsFailure(t *testing.T) {
 	defer server.Close()
 
 	mc := new(MockMetricsCollector)
-	a := NewAgent(server.URL, 5, 10, "secret", 2, mc)
+	cnf := config.Config{
+		Address:        server.URL,
+		ReportInterval: config.Duration{Duration: time.Second * 5},
+		PollInterval:   config.Duration{Duration: time.Second * 10},
+		RateLimit:      2,
+	}
+	a := NewAgent(cnf, mc)
 
 	metrics := services.NewAgentMetrics()
 	metrics.Gauge.UpdateMetric("test_gauge", 123.45)

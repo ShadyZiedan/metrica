@@ -49,14 +49,14 @@ var (
 
 func main() {
 	showBuildInfo()
-	cnf := config.ParseConfig()
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	err := logger.Initialize("info")
 	if err != nil {
 		panic(err)
 	}
+
+	cnf := config.ParseConfig()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 
 	conn, err := pgxpool.New(ctx, cnf.DatabaseDsn)
 	if err != nil {
@@ -78,7 +78,7 @@ func main() {
 
 	fileStorageServiceConfig := services.FileStorageServiceConfig{
 		FileStoragePath: cnf.FileStoragePath,
-		StoreInterval:   cnf.StoreInterval,
+		StoreInterval:   cnf.StoreInterval.Duration,
 		Restore:         cnf.Restore,
 	}
 
@@ -96,12 +96,23 @@ func main() {
 	if cnf.Key != "" {
 		hasherimpl = security.NewDefaultHasher(cnf.Key)
 	}
-	router := handlers.NewRouter(
-		conn,
-		appStorage,
+	middlewares := []func(http.Handler) http.Handler{
 		middleware.RequestLogger,
 		middleware.HashChecker(hasherimpl),
 		middleware.Compress,
+	}
+	if cnf.CryptoKey != "" {
+		encryptionMiddleWare, encryptionErr := middleware.NewEncryptionFromFile(cnf.CryptoKey)
+		if encryptionErr != nil {
+			logger.Log.Error("failed to create encryption middleware", zap.Error(err))
+		}
+		middlewares = append(middlewares, encryptionMiddleWare.MiddleWare)
+	}
+
+	router := handlers.NewRouter(
+		conn,
+		appStorage,
+		middlewares...,
 	)
 
 	router.Handle(`/debug/pprof/*`, http.DefaultServeMux)
@@ -113,8 +124,7 @@ func main() {
 
 	go func() {
 		defer wg.Done()
-		err = srv.ListenAndServe(ctx)
-		if err != nil {
+		if err = srv.ListenAndServe(ctx); err != nil {
 			panic(err)
 		}
 	}()
