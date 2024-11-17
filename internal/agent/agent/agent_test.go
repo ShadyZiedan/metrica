@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"github.com/go-resty/resty/v2"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -43,10 +44,9 @@ func TestNewAgent(t *testing.T) {
 		RateLimit:      2,
 	}
 
-	a := NewAgent(cnf, mc)
+	a := NewAgent(cnf, mc, nil)
 
 	assert.NotNil(t, a)
-	assert.Equal(t, "http://example.com", a.Client.BaseURL)
 	assert.Equal(t, 5*time.Second, a.PollInterval)
 	assert.Equal(t, 10*time.Second, a.ReportInterval)
 	assert.Equal(t, 2, a.RateLimit)
@@ -74,7 +74,8 @@ func TestSendMetricsToServer(t *testing.T) {
 		PollInterval:   config.Duration{Duration: time.Second * 10},
 		RateLimit:      2,
 	}
-	a := NewAgent(cnf, mc)
+	ms := services.NewMetricsSender(resty.New().SetBaseURL(server.URL), nil)
+	a := NewAgent(cnf, mc, ms)
 
 	metrics := services.NewAgentMetrics()
 
@@ -94,7 +95,8 @@ func TestRun(t *testing.T) {
 		PollInterval:   config.Duration{Duration: time.Second * 1},
 		RateLimit:      2,
 	}
-	a := NewAgent(cnf, mc)
+
+	a := NewAgent(cnf, mc, services.NewMetricsSender(resty.New().SetBaseURL(cnf.Address), nil))
 
 	// Set up a mock for metrics collection
 	mc.On("IncreasePollCount").Return()
@@ -129,7 +131,7 @@ func TestSendMetricsFailure(t *testing.T) {
 		PollInterval:   config.Duration{Duration: time.Second * 10},
 		RateLimit:      2,
 	}
-	a := NewAgent(cnf, mc)
+	a := NewAgent(cnf, mc, services.NewMetricsSender(resty.New().SetBaseURL(server.URL), nil))
 
 	metrics := services.NewAgentMetrics()
 	metrics.Gauge.UpdateMetric("test_gauge", 123.45)
@@ -155,7 +157,7 @@ func TestMetricsRealIP(t *testing.T) {
 		PollInterval:   config.Duration{Duration: time.Second * 10},
 		RateLimit:      2,
 	}
-	a := NewAgent(cnf, mc)
+	a := NewAgent(cnf, mc, services.NewMetricsSender(resty.New().SetBaseURL(server.URL), nil))
 
 	metrics := services.NewAgentMetrics()
 	metrics.Gauge.UpdateMetric("test_gauge", 123.45)

@@ -136,6 +136,16 @@ func main() {
 			panic(err)
 		}
 	}()
+
+	if cnf.GrpcAddress != "" {
+		grpcServer := server.NewGRPCServer(cnf.GrpcAddress, appStorage)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			grpcServer.Run(ctx)
+		}()
+	}
+
 	wg.Wait()
 }
 
