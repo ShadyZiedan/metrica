@@ -5,18 +5,29 @@ import (
 	"math/rand"
 	"runtime"
 
-	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
+// MemoryProvider is an interface for retrieving memory statistics.
+type MemoryProvider interface {
+	VirtualMemory() (*mem.VirtualMemoryStat, error)
+}
+
+// CPUProvider is an interface for retrieving CPU statistics.
+type CPUProvider interface {
+	Percent(interval uint64, percpu bool) ([]float64, error)
+}
+
 // MerticsCollector collects metrics from various sources and provides a way to access them.
 type MerticsCollector struct {
-	pollCount int
+	pollCount   int
+	memProvider MemoryProvider
+	cpuProvider CPUProvider
 }
 
 // NewMetricsCollector creates a new instance of MetricsCollector.
-func NewMetricsCollector() *MerticsCollector {
-	return &MerticsCollector{}
+func NewMetricsCollector(memProvider MemoryProvider, cpuProvider CPUProvider) *MerticsCollector {
+	return &MerticsCollector{memProvider: memProvider, cpuProvider: cpuProvider}
 }
 
 // Collect collects metrics from various sources and returns them.
@@ -59,14 +70,14 @@ func (mc *MerticsCollector) Collect() *AgentMetrics {
 	metrics.Counter.UpdateMetric("PollCount", mc.pollCount)
 
 	// collecting virtual memory info
-	memory, err := mem.VirtualMemory()
+	memory, err := mc.memProvider.VirtualMemory()
 	if err == nil {
 		metrics.Gauge.UpdateMetric("TotalMemory", float64(memory.Total))
 		metrics.Gauge.UpdateMetric("FreeMemory", float64(memory.Free))
 	}
 
 	// collecting cpu utilization info
-	cpuUsages, err := cpu.Percent(0, true)
+	cpuUsages, err := mc.cpuProvider.Percent(0, true)
 	if err == nil {
 		for i, cpuUsage := range cpuUsages {
 			metrics.Gauge.UpdateMetric(fmt.Sprintf("CPUutilization%d", i), cpuUsage)

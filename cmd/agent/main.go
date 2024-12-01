@@ -6,12 +6,15 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/shadyziedan/metrica/internal/security"
 	pb "github.com/shadyziedan/metrica/proto"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/shadyziedan/metrica/internal/agent/agent"
 	"github.com/shadyziedan/metrica/internal/agent/config"
@@ -61,7 +64,7 @@ func main() {
 	}
 	newAgent := agent.NewAgent(
 		cnf,
-		services.NewMetricsCollector(),
+		services.NewMetricsCollector(&RealMemoryProvider{}, &RealCPUProvider{}),
 		services.NewMetricsSender(httpClient, grpcClient, options...),
 	)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
@@ -85,4 +88,18 @@ func showBuildInfo() {
 	} else {
 		fmt.Println("Build commit: N/A")
 	}
+}
+
+// RealMemoryProvider is a real implementation of MemoryProvider using gopsutil
+type RealMemoryProvider struct{}
+
+func (r *RealMemoryProvider) VirtualMemory() (*mem.VirtualMemoryStat, error) {
+	return mem.VirtualMemory()
+}
+
+// RealCPUProvider is a real implementation of CPUProvider using gopsutil
+type RealCPUProvider struct{}
+
+func (r *RealCPUProvider) Percent(interval uint64, percpu bool) ([]float64, error) {
+	return cpu.Percent(time.Duration(interval), percpu)
 }
