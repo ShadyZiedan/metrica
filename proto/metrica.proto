@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package metrica;
+
+option go_package = "github.com/shadyziedan/metrica/proto";
+
+service MetricsService {
+  rpc UpdateBatchMetrics(UpdateBatchRequest) returns (UpdateBatchResponse);
+}
+
+message Metric {
+  string id = 1;
+  enum MType {
+    COUNTER = 0;
+    GAUGE = 1;
+  }
+  MType m_type = 2;
+  optional int64 delta = 3;
+  optional double value = 4;
+}
+
+message UpdateBatchRequest {
+  repeated Metric metrics = 1;
+}
+
+message UpdateBatchResponse {
+  repeated Metric metrics = 1;
+}

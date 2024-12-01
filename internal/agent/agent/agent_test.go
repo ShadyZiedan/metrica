@@ -3,12 +3,14 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"github.com/shadyziedan/metrica/internal/agent/config"
+	"github.com/go-resty/resty/v2"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/shadyziedan/metrica/internal/agent/config"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -42,10 +44,9 @@ func TestNewAgent(t *testing.T) {
 		RateLimit:      2,
 	}
 
-	a := NewAgent(cnf, mc)
+	a := NewAgent(cnf, mc, nil)
 
 	assert.NotNil(t, a)
-	assert.Equal(t, "http://example.com", a.Client.BaseURL)
 	assert.Equal(t, 5*time.Second, a.PollInterval)
 	assert.Equal(t, 10*time.Second, a.ReportInterval)
 	assert.Equal(t, 2, a.RateLimit)
@@ -73,7 +74,8 @@ func TestSendMetricsToServer(t *testing.T) {
 		PollInterval:   config.Duration{Duration: time.Second * 10},
 		RateLimit:      2,
 	}
-	a := NewAgent(cnf, mc)
+	ms := services.NewMetricsSender(resty.New().SetBaseURL(server.URL), nil)
+	a := NewAgent(cnf, mc, ms)
 
 	metrics := services.NewAgentMetrics()
 
@@ -93,7 +95,8 @@ func TestRun(t *testing.T) {
 		PollInterval:   config.Duration{Duration: time.Second * 1},
 		RateLimit:      2,
 	}
-	a := NewAgent(cnf, mc)
+
+	a := NewAgent(cnf, mc, services.NewMetricsSender(resty.New().SetBaseURL(cnf.Address), nil))
 
 	// Set up a mock for metrics collection
 	mc.On("IncreasePollCount").Return()
@@ -128,7 +131,7 @@ func TestSendMetricsFailure(t *testing.T) {
 		PollInterval:   config.Duration{Duration: time.Second * 10},
 		RateLimit:      2,
 	}
-	a := NewAgent(cnf, mc)
+	a := NewAgent(cnf, mc, services.NewMetricsSender(resty.New().SetBaseURL(server.URL), nil))
 
 	metrics := services.NewAgentMetrics()
 	metrics.Gauge.UpdateMetric("test_gauge", 123.45)
@@ -137,4 +140,28 @@ func TestSendMetricsFailure(t *testing.T) {
 	err := a.sendMetricsToServer(context.Background(), metrics)
 	assert.Error(t, err)
 	assert.Equal(t, "request failed with status 500: Internal Server Error", err.Error())
+}
+
+func TestMetricsRealIP(t *testing.T) {
+	// Set up a mock server to respond to the request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.NotEmpty(t, r.Header.Get("X-Real-IP"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	mc := new(MockMetricsCollector)
+	cnf := config.Config{
+		Address:        server.URL,
+		ReportInterval: config.Duration{Duration: time.Second * 5},
+		PollInterval:   config.Duration{Duration: time.Second * 10},
+		RateLimit:      2,
+	}
+	a := NewAgent(cnf, mc, services.NewMetricsSender(resty.New().SetBaseURL(server.URL), nil))
+
+	metrics := services.NewAgentMetrics()
+	metrics.Gauge.UpdateMetric("test_gauge", 123.45)
+	metrics.Counter.UpdateMetric("test_counter", 1)
+	err := a.sendMetricsToServer(context.Background(), metrics)
+	assert.NoError(t, err)
 }

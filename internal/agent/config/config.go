@@ -3,6 +3,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"github.com/shadyziedan/metrica/internal/agent/logger"
 	"go.uber.org/zap"
@@ -26,10 +27,37 @@ type Config struct {
 	RateLimit int `env:"RATE_LIMIT" json:"-"`
 	// CryptoKey is a path to public key to encrypt data sent to the server
 	CryptoKey string `env:"CRYPTO_KEY" json:"crypto_key"`
+	// GrpcAddress is grpc server host address
+	GrpcAddress string `env:"GRPC_ADDRESS" json:"grpc_address"`
 }
 
 type Duration struct {
 	time.Duration
+}
+
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
+}
+
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	var v interface{}
+	if err := json.Unmarshal(b, &v); err != nil {
+		return err
+	}
+	switch value := v.(type) {
+	case float64:
+		d.Duration = time.Duration(value)
+		return nil
+	case string:
+		var err error
+		d.Duration, err = time.ParseDuration(value)
+		if err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.New("invalid duration")
+	}
 }
 
 // ParseConfig parses the command-line flags and environment variables to create a new Config instance.
@@ -45,6 +73,7 @@ func ParseConfig() Config {
 	flag.StringVar(&cnf.Key, "k", "", "Ключ")
 	flag.IntVar(&cnf.RateLimit, "l", 1, "Rate limit")
 	flag.StringVar(&cnf.CryptoKey, "crypto-key", "", "путь до файла с публичным ключом")
+	flag.StringVar(&cnf.GrpcAddress, "grpc-address", "", "адрес grpc сервер")
 
 	flag.Parse()
 

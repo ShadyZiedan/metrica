@@ -29,6 +29,10 @@ type Config struct {
 	Key string `env:"KEY" json:"-"`
 	// CryptoKey is a path to the private key to decrypt message received from the agent
 	CryptoKey string `env:"CRYPTO_KEY" json:"crypto_key"`
+	// TrustedSubnet is a string representing the IP address or network range that can access the server
+	TrustedSubnet string `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
+	//GrpcAddress is grpc server's address
+	GrpcAddress string `env:"GRPC_ADDRESS" json:"grpc_address"`
 }
 
 type Duration struct {
@@ -73,6 +77,8 @@ func ParseConfig() Config {
 	flag.StringVar(&cnf.DatabaseDsn, "d", "", "Строка с адресом подключения к БД")
 	flag.StringVar(&cnf.Key, "k", "", "Ключ")
 	flag.StringVar(&cnf.CryptoKey, "crypto-key", "", "путь до файла с приватным ключом")
+	flag.StringVar(&cnf.TrustedSubnet, "trusted-subnet", "", "подсеть, из которой разрешен доступ к серверу")
+	flag.StringVar(&cnf.GrpcAddress, "grpc-address", "", "адрес grpc сервера")
 	flag.Parse()
 
 	if configPathJSON != "" {
