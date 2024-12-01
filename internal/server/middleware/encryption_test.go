@@ -47,6 +47,7 @@ func TestMiddleware_MissingEncryptionKey(t *testing.T) {
 	// Make a request without the X-Encrypted-Key header
 	resp, err := http.Post(ts.URL, "application/json", bytes.NewReader([]byte(`{"data": "test"}`)))
 	assert.NoError(t, err)
+	defer resp.Body.Close()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
@@ -88,6 +89,7 @@ func TestMiddleware_SuccessfulDecryption(t *testing.T) {
 
 	resp, err := ts.Client().Do(req)
 	assert.NoError(t, err)
+	defer resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
@@ -129,6 +131,7 @@ func TestMiddleware_DecryptionFailure(t *testing.T) {
 
 	resp, err := ts.Client().Do(req)
 	assert.NoError(t, err)
+	defer resp.Body.Close()
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
